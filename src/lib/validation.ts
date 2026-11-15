@@ -38,6 +38,7 @@ export const registerSchema = z.object({
 export const loginSchema = z.object({
   email: emailSchema,
   password: z.string().min(1, "Password is required").max(100),
+  role: z.enum(["CUSTOMER", "STAFF", "OWNER"]).optional(), // "I am a" dropdown on the login page
 });
 
 export const profileSchema = z.object({
