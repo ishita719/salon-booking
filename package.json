@@ -1,0 +1,45 @@
+{
+  "name": "salon-booking",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Appointment booking website for a Vancouver salon (in-salon and at-home visits).",
+  "scripts": {
+    "dev": "node scripts/dev-schema.mjs && prisma generate --schema prisma/dev/schema.prisma && next dev",
+    "build": "prisma generate && next build",
+    "vercel-build": "prisma generate && prisma migrate deploy && tsx prisma/seed.ts && next build",
+    "start": "next start",
+    "lint": "tsc --noEmit",
+    "postinstall": "prisma generate",
+    "db:push": "node scripts/dev-schema.mjs && prisma db push --schema prisma/dev/schema.prisma",
+    "db:seed": "tsx prisma/seed.ts",
+    "setup": "npm run db:push && tsx prisma/seed.ts",
+    "test": "tsx --test tests/*.test.ts"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.16.0",
+    "bcryptjs": "^2.4.3",
+    "jose": "^5.9.6",
+    "next": "^15.5.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "zod": "^3.25.0"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/node": "^22.10.0",
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.0",
+    "prisma": "^6.16.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  },
+  "allowScripts": {
+    "prisma@6.19.3": true,
+    "@prisma/client@6.19.3": true,
+    "@prisma/engines@6.19.3": true,
+    "esbuild@0.28.2": true
+  }
+}

@@ -1,0 +1,23 @@
+node_modules/
+.next/
+out/
+build/
+*.tsbuildinfo
+next-env.d.ts
+
+# Secrets — never commit
+.env
+.env.local
+.env*.local
+
+# Local SQLite database + auto-generated local schema
+prisma/*.db
+prisma/*.db-journal
+prisma/dev/
+
+# Editor / tool settings
+.claude/
+
+.vercel
+npm-debug.log*
+.DS_Store

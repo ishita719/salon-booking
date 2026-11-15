@@ -1,0 +1,119 @@
+// Database schema — the single source of truth.
+// Production (Vercel): PostgreSQL (Neon). Changes ship as migrations in prisma/migrations.
+// Local development: `npm run dev` auto-generates a SQLite copy of this file in prisma/dev/
+// (see scripts/dev-schema.mjs), so you can work offline without installing Postgres.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL") // pooled connection (used by the website)
+  directUrl = env("DATABASE_URL_UNPOOLED") // direct connection (used for migrations)
+}
+
+// Everyone who can log in: clients, staff and the owner.
+model User {
+  id           String        @id @default(cuid())
+  name         String
+  email        String        @unique
+  phone        String
+  passwordHash String
+  role         String        @default("CUSTOMER") // CUSTOMER | STAFF | OWNER
+  active       Boolean       @default(true) // false = can't log in (e.g. staff who left)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  appointments Appointment[]
+  stylist      Stylist? // set for STAFF users
+}
+
+model Service {
+  id            String            @id @default(cuid())
+  name          String
+  category      String
+  description   String
+  durationMin   Int
+  priceCents    Int
+  homeAvailable Boolean           @default(true)
+  active        Boolean           @default(true)
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+  items         AppointmentItem[]
+}
+
+// A bookable team member. Linked to a STAFF login through userId.
+model Stylist {
+  id           String        @id @default(cuid())
+  name         String
+  title        String
+  bio          String        @default("")
+  active       Boolean       @default(true)
+  workDays     String        @default("0,2,3,4,5,6") // weekdays worked, 0 = Sunday
+  userId       String?       @unique
+  user         User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+  appointments Appointment[]
+  timeOff      TimeOff[]
+}
+
+// Staff unavailability (vacation, appointment, sick day). Blocks booking.
+model TimeOff {
+  id        String   @id @default(cuid())
+  stylistId String
+  stylist   Stylist  @relation(fields: [stylistId], references: [id], onDelete: Cascade)
+  date      String // YYYY-MM-DD
+  startMin  Int
+  endMin    Int
+  reason    String   @default("")
+  createdAt DateTime @default(now())
+
+  @@index([date])
+}
+
+model Appointment {
+  id              String            @id @default(cuid())
+  // Registered client. Null for walk-in / phone bookings made by staff (then guest* fields are used).
+  userId          String?
+  user            User?             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  guestName       String?
+  guestPhone      String?
+  guestEmail      String?
+  source          String            @default("ONLINE") // ONLINE (client booked) | STAFF (salon booked)
+  stylistId       String?
+  stylist         Stylist?          @relation(fields: [stylistId], references: [id], onDelete: SetNull)
+  // Stored as salon-local (America/Vancouver) calendar date + minutes after midnight.
+  date            String // YYYY-MM-DD
+  startMin        Int
+  endMin          Int
+  status          String            @default("BOOKED") // BOOKED | CONFIRMED | COMPLETED | CANCELLED | NO_SHOW
+  locationType    String            @default("SALON") // SALON | HOME
+  address         String?
+  postalCode      String?
+  notes           String?
+  subtotalCents   Int               @default(0)
+  travelFeeCents  Int               @default(0)
+  hasCustom       Boolean           @default(false)
+  rescheduleCount Int               @default(0)
+  cancelledAt     DateTime?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  items           AppointmentItem[]
+
+  @@index([date, status])
+  @@index([userId])
+  @@index([stylistId, date])
+}
+
+// One line per service on an appointment. Name/price/duration are copied at booking time
+// so later price changes don't rewrite history. serviceId is null for custom (typed-in) services.
+model AppointmentItem {
+  id            String      @id @default(cuid())
+  appointmentId String
+  appointment   Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  serviceId     String?
+  service       Service?    @relation(fields: [serviceId], references: [id], onDelete: SetNull)
+  name          String
+  durationMin   Int
+  priceCents    Int? // null = custom service, priced at the visit
+  isCustom      Boolean     @default(false)
+}
