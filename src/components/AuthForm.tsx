@@ -111,17 +111,25 @@ export default function AuthForm({ mode }: { mode: "login" | "register" }) {
             {busy ? "Please wait…" : isLogin ? `Log in as ${text.option.toLowerCase()}` : "Create account"}
           </button>
         </form>
-        <p className="small muted center" style={{ marginTop: 16, marginBottom: 0 }}>
-          {!isLogin ? (
-            <>Already have an account? <Link href="/login">Log in</Link></>
-          ) : role === "CUSTOMER" ? (
-            <>New here? <Link href="/register">Create an account</Link></>
-          ) : role === "STAFF" ? (
-            <>Staff logins are created by the salon owner. Forgot your password? Ask the owner to reset it.</>
-          ) : (
-            <>The owner account is set up when the website is installed.</>
-          )}
-        </p>
+        {isLogin ? (
+          <>
+            <div className="or-divider"><span>New to {"Maple & Mane"}?</span></div>
+            <Link href="/register" className="btn btn-outline" style={{ width: "100%" }}>
+              Create your account
+            </Link>
+            <p className="small muted center" style={{ marginTop: 10, marginBottom: 0 }}>
+              {role === "CUSTOMER"
+                ? "Free client account — book and manage your appointments online."
+                : role === "STAFF"
+                  ? "Client accounts only. Staff logins are created by the salon owner (Team page) — ask the owner if you need one or forgot your password."
+                  : "Client accounts only. The owner account is set up when the website is installed."}
+            </p>
+          </>
+        ) : (
+          <p className="small muted center" style={{ marginTop: 16, marginBottom: 0 }}>
+            Already have an account? <Link href="/login">Log in</Link>
+          </p>
+        )}
       </div>
     </div>
   );
