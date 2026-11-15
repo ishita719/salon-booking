@@ -33,6 +33,19 @@ export const registerSchema = z.object({
   email: emailSchema,
   phone: phoneSchema,
   password: passwordSchema,
+  // "I am a" on the sign-up page. STAFF waits for owner approval; OWNER needs the owner access code.
+  role: z.enum(["CUSTOMER", "STAFF", "OWNER"]).default("CUSTOMER"),
+  ownerCode: z.string().max(200).optional(),
+});
+
+export const staffRequestSchema = z.object({
+  action: z.enum(["approve", "reject"]),
+  title: z.string().trim().min(2).max(60).optional(),
+  workDays: z
+    .array(z.number().int().min(0).max(6))
+    .max(7)
+    .transform((d) => [...new Set(d)].sort().join(","))
+    .optional(),
 });
 
 export const loginSchema = z.object({

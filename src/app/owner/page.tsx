@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { StatusBadge } from "@/components/AppointmentCard";
 import { pageUser } from "@/lib/auth";
+import { prisma } from "@/lib/db";
 import { getOwnerStats } from "@/lib/stats";
 import { formatDate } from "@/lib/time";
 
@@ -10,7 +11,10 @@ export const dynamic = "force-dynamic";
 
 export default async function OwnerDashboard() {
   const user = await pageUser(["OWNER"]);
-  const s = await getOwnerStats();
+  const [s, pendingStaff] = await Promise.all([
+    getOwnerStats(),
+    prisma.user.count({ where: { role: "STAFF", active: false, stylist: null } }),
+  ]);
 
   const cards = [
     { label: "Revenue this month", value: s.revenueMonth, hint: "completed visits" },
@@ -36,6 +40,15 @@ export default async function OwnerDashboard() {
           <Link href="/book" className="btn">New booking</Link>
         </div>
       </div>
+
+      {pendingStaff > 0 && (
+        <div className="alert alert-info spread" style={{ marginTop: 16 }}>
+          <span>
+            <strong>{pendingStaff}</strong> staff sign-up request{pendingStaff > 1 ? "s are" : " is"} waiting for your approval.
+          </span>
+          <Link href="/owner/team" className="btn btn-sm">Review</Link>
+        </div>
+      )}
 
       <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", marginTop: 20 }}>
         {cards.map((c) => (

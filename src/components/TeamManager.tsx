@@ -32,6 +32,14 @@ function WeekdayPicker({ value, onChange }: { value: number[]; onChange: (v: num
   );
 }
 
+interface Request {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  createdAt: string;
+}
+
 const EMPTY = { name: "", title: "", bio: "", email: "", phone: "", password: "", workDays: [2, 3, 4, 5, 6] };
 
 export default function TeamManager() {
@@ -40,10 +48,27 @@ export default function TeamManager() {
   const [editing, setEditing] = useState<(Member & { newPassword: string }) | null>(null);
   const [flash, setFlash] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
 
+  const [requests, setRequests] = useState<Request[]>([]);
+  const [approving, setApproving] = useState<{ id: string; title: string; workDays: number[] } | null>(null);
+
   const load = useCallback(async () => {
-    const r = await api<{ team: Member[] }>("/api/team");
+    const [r, q] = await Promise.all([api<{ team: Member[] }>("/api/team"), api<{ requests: Request[] }>("/api/team/requests")]);
     setTeam(r.team);
+    setRequests(q.requests);
   }, []);
+
+  async function decide(req: Request, action: "approve" | "reject") {
+    if (action === "reject" && !window.confirm(`Reject ${req.name}'s staff request? Their sign-up will be removed.`)) return;
+    try {
+      const body = action === "approve" && approving?.id === req.id ? { action, title: approving.title || undefined, workDays: approving.workDays } : { action };
+      await api(`/api/team/requests/${req.id}`, { method: "PATCH", body });
+      setFlash({ kind: "ok", text: action === "approve" ? `${req.name} approved — they can now log in as staff.` : `${req.name}'s request was rejected.` });
+      setApproving(null);
+      await load();
+    } catch (err) {
+      setFlash({ kind: "error", text: (err as Error).message });
+    }
+  }
 
   useEffect(() => {
     load().catch((e) => setFlash({ kind: "error", text: e.message }));
@@ -102,6 +127,43 @@ export default function TeamManager() {
         <button className="btn" onClick={() => { setAdding({ ...EMPTY }); setEditing(null); }}>Add team member</button>
       </div>
       {flash && <div className={`alert alert-${flash.kind}`} role="status">{flash.text}</div>}
+
+      {requests.length > 0 && (
+        <section className="card" style={{ marginBottom: 20, borderColor: "var(--accent)" }}>
+          <h2>Staff sign-up requests <span className="badge badge-NO_SHOW">{requests.length}</span></h2>
+          <p className="muted small">These people chose &quot;Staff&quot; when creating an account. They can&apos;t log in until you approve them.</p>
+          {requests.map((r) => (
+            <div key={r.id} style={{ borderTop: "1px solid var(--line)", padding: "12px 0" }}>
+              <div className="spread">
+                <div>
+                  <strong>{r.name}</strong>
+                  <div className="small muted">{r.email} · {r.phone} · requested {new Date(r.createdAt).toLocaleDateString("en-CA")}</div>
+                </div>
+                <div className="row">
+                  {approving?.id !== r.id ? (
+                    <button className="btn btn-sm" onClick={() => setApproving({ id: r.id, title: "Stylist", workDays: [2, 3, 4, 5, 6] })}>Approve…</button>
+                  ) : (
+                    <button className="btn btn-sm" onClick={() => decide(r, "approve")}>Confirm approval</button>
+                  )}
+                  <button className="btn btn-danger btn-sm" onClick={() => decide(r, "reject")}>Reject</button>
+                </div>
+              </div>
+              {approving?.id === r.id && (
+                <div className="row" style={{ marginTop: 10, alignItems: "flex-end" }}>
+                  <div className="field" style={{ marginBottom: 0, minWidth: 200 }}>
+                    <label htmlFor={`ap-title-${r.id}`}>Job title</label>
+                    <input id={`ap-title-${r.id}`} type="text" maxLength={60} value={approving.title} onChange={(e) => setApproving({ ...approving, title: e.target.value })} />
+                  </div>
+                  <div>
+                    <label>Working days</label>
+                    <WeekdayPicker value={approving.workDays} onChange={(v) => setApproving({ ...approving, workDays: v })} />
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+        </section>
+      )}
 
       {adding && (
         <form className="card" onSubmit={create} style={{ marginBottom: 20 }}>

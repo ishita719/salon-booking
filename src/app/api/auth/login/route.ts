@@ -15,10 +15,18 @@ export const POST = route(async (req) => {
   rateLimit(`login:${clientIp(req)}`, 20, 15 * 60 * 1000);
   rateLimit(`login:${email}`, 8, 15 * 60 * 1000);
 
-  const user = await prisma.user.findUnique({ where: { email } });
+  const user = await prisma.user.findUnique({ where: { email }, include: { stylist: { select: { id: true } } } });
   const ok = await bcrypt.compare(password, user?.passwordHash ?? DUMMY_HASH);
   if (!user || !ok) throw new ApiError(401, "Email or password is incorrect.");
-  if (!user.active) throw new ApiError(403, "This account has been deactivated. Please contact the salon owner.");
+  if (!user.active) {
+    const pending = user.role === "STAFF" && !user.stylist;
+    throw new ApiError(
+      403,
+      pending
+        ? "Your staff account is waiting for the salon owner's approval. You'll be able to log in once it's approved."
+        : "This account has been deactivated. Please contact the salon owner.",
+    );
+  }
 
   // The "I am a" dropdown must match the account's real role (decided by the database, never the form).
   const role = parseRole(user.role);
