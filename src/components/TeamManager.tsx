@@ -32,12 +32,82 @@ function WeekdayPicker({ value, onChange }: { value: number[]; onChange: (v: num
   );
 }
 
-interface Request {
-  id: string;
-  name: string;
-  email: string;
-  phone: string;
-  createdAt: string;
+/** Owner sets the code staff need to create an account and to log in (every time). */
+function StaffCodePanel() {
+  const [code, setCode] = useState<string | null | undefined>(undefined);
+  const [custom, setCustom] = useState("");
+  const [msg, setMsg] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    api<{ code: string | null }>("/api/team/code").then((r) => setCode(r.code)).catch((e) => setMsg({ kind: "error", text: e.message }));
+  }, []);
+
+  async function save(body: { generate?: boolean; code?: string }) {
+    if (code && !window.confirm("Change the staff code? Every staff member will be logged out and will need the NEW code to log in.")) return;
+    try {
+      const r = await api<{ code: string }>("/api/team/code", { method: "PUT", body });
+      setCode(r.code);
+      setCustom("");
+      setMsg({ kind: "ok", text: "Staff code saved. Share it privately with your team (in person or by text)." });
+    } catch (err) {
+      setMsg({ kind: "error", text: (err as Error).message });
+    }
+  }
+
+  return (
+    <section className="card" style={{ marginBottom: 24 }}>
+      <div className="spread" style={{ alignItems: "flex-start" }}>
+        <div>
+          <h2 style={{ fontSize: "1.4rem", marginBottom: 4 }}>Staff code</h2>
+          <p className="muted small" style={{ maxWidth: 560 }}>
+            Staff need this code to <strong>create their account</strong> and <strong>every time they log in</strong> at the Team login.
+            Changing it logs every staff member out — useful when someone leaves.
+          </p>
+        </div>
+      </div>
+      {msg && <div className={`alert alert-${msg.kind}`}>{msg.text}</div>}
+      {code === undefined ? (
+        <p className="muted">Loading…</p>
+      ) : code ? (
+        <div className="code-box">
+          <span className="code">{code}</span>
+          <button
+            type="button"
+            className="btn btn-sm btn-ghost"
+            onClick={() => {
+              navigator.clipboard?.writeText(code).then(() => {
+                setCopied(true);
+                setTimeout(() => setCopied(false), 1500);
+              });
+            }}
+          >
+            {copied ? "Copied ✓" : "Copy"}
+          </button>
+          <button type="button" className="btn btn-sm btn-outline" onClick={() => save({ generate: true })}>Generate new code</button>
+        </div>
+      ) : (
+        <div className="alert alert-gold spread">
+          <span>No staff code yet — staff can&apos;t join or log in until you set one.</span>
+          <button type="button" className="btn btn-sm btn-gold" onClick={() => save({ generate: true })}>Generate a code</button>
+        </div>
+      )}
+      <form
+        className="row"
+        style={{ marginTop: 14 }}
+        onSubmit={(e) => {
+          e.preventDefault();
+          save({ code: custom });
+        }}
+      >
+        <input type="text" className="code-input" style={{ maxWidth: 260 }} placeholder="Or type your own code" value={custom} onChange={(e) => setCustom(e.target.value)} minLength={6} maxLength={32} aria-label="Custom staff code" />
+        <button className="btn btn-ghost btn-sm" disabled={custom.trim().length < 6}>Use this code</button>
+      </form>
+      <p className="small muted" style={{ marginTop: 12, marginBottom: 0 }}>
+        New staff join at <strong>/team/join</strong>. You can also add someone yourself with &quot;Add team member&quot; below.
+      </p>
+    </section>
+  );
 }
 
 const EMPTY = { name: "", title: "", bio: "", email: "", phone: "", password: "", workDays: [2, 3, 4, 5, 6] };
@@ -48,27 +118,10 @@ export default function TeamManager() {
   const [editing, setEditing] = useState<(Member & { newPassword: string }) | null>(null);
   const [flash, setFlash] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
 
-  const [requests, setRequests] = useState<Request[]>([]);
-  const [approving, setApproving] = useState<{ id: string; title: string; workDays: number[] } | null>(null);
-
   const load = useCallback(async () => {
-    const [r, q] = await Promise.all([api<{ team: Member[] }>("/api/team"), api<{ requests: Request[] }>("/api/team/requests")]);
+    const r = await api<{ team: Member[] }>("/api/team");
     setTeam(r.team);
-    setRequests(q.requests);
   }, []);
-
-  async function decide(req: Request, action: "approve" | "reject") {
-    if (action === "reject" && !window.confirm(`Reject ${req.name}'s staff request? Their sign-up will be removed.`)) return;
-    try {
-      const body = action === "approve" && approving?.id === req.id ? { action, title: approving.title || undefined, workDays: approving.workDays } : { action };
-      await api(`/api/team/requests/${req.id}`, { method: "PATCH", body });
-      setFlash({ kind: "ok", text: action === "approve" ? `${req.name} approved — they can now log in as staff.` : `${req.name}'s request was rejected.` });
-      setApproving(null);
-      await load();
-    } catch (err) {
-      setFlash({ kind: "error", text: (err as Error).message });
-    }
-  }
 
   useEffect(() => {
     load().catch((e) => setFlash({ kind: "error", text: e.message }));
@@ -121,49 +174,15 @@ export default function TeamManager() {
     <div className="container section">
       <div className="spread">
         <div>
+          <div className="eyebrow">Owner</div>
           <h1>Team</h1>
-          <p className="muted">Add staff logins, set working days and manage time off.</p>
+          <p className="muted">Set the staff code, add team members, set working days and manage time off.</p>
         </div>
         <button className="btn" onClick={() => { setAdding({ ...EMPTY }); setEditing(null); }}>Add team member</button>
       </div>
       {flash && <div className={`alert alert-${flash.kind}`} role="status">{flash.text}</div>}
 
-      {requests.length > 0 && (
-        <section className="card" style={{ marginBottom: 20, borderColor: "var(--accent)" }}>
-          <h2>Staff sign-up requests <span className="badge badge-NO_SHOW">{requests.length}</span></h2>
-          <p className="muted small">These people chose &quot;Staff&quot; when creating an account. They can&apos;t log in until you approve them.</p>
-          {requests.map((r) => (
-            <div key={r.id} style={{ borderTop: "1px solid var(--line)", padding: "12px 0" }}>
-              <div className="spread">
-                <div>
-                  <strong>{r.name}</strong>
-                  <div className="small muted">{r.email} · {r.phone} · requested {new Date(r.createdAt).toLocaleDateString("en-CA")}</div>
-                </div>
-                <div className="row">
-                  {approving?.id !== r.id ? (
-                    <button className="btn btn-sm" onClick={() => setApproving({ id: r.id, title: "Stylist", workDays: [2, 3, 4, 5, 6] })}>Approve…</button>
-                  ) : (
-                    <button className="btn btn-sm" onClick={() => decide(r, "approve")}>Confirm approval</button>
-                  )}
-                  <button className="btn btn-danger btn-sm" onClick={() => decide(r, "reject")}>Reject</button>
-                </div>
-              </div>
-              {approving?.id === r.id && (
-                <div className="row" style={{ marginTop: 10, alignItems: "flex-end" }}>
-                  <div className="field" style={{ marginBottom: 0, minWidth: 200 }}>
-                    <label htmlFor={`ap-title-${r.id}`}>Job title</label>
-                    <input id={`ap-title-${r.id}`} type="text" maxLength={60} value={approving.title} onChange={(e) => setApproving({ ...approving, title: e.target.value })} />
-                  </div>
-                  <div>
-                    <label>Working days</label>
-                    <WeekdayPicker value={approving.workDays} onChange={(v) => setApproving({ ...approving, workDays: v })} />
-                  </div>
-                </div>
-              )}
-            </div>
-          ))}
-        </section>
-      )}
+      <StaffCodePanel />
 
       {adding && (
         <form className="card" onSubmit={create} style={{ marginBottom: 20 }}>

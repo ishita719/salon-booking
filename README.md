@@ -1,88 +1,50 @@
 # Maple & Mane Studio — Salon Booking Website
 
-A full-stack appointment booking site for a Vancouver salon that works **in-studio and at clients' homes**.
-It's built with **Next.js 15 (React 19, TypeScript)**, a **Prisma** database layer (SQLite locally, Postgres in production), and secure cookie-based login.
+Appointment booking for a Vancouver salon that works **in the studio and at clients' homes**.
+**Stack:** Next.js 15 (React 19, TypeScript) · Cloudflare Workers (via OpenNext) · Cloudflare D1 database · Drizzle ORM.
+Code lives on GitHub; Cloudflare rebuilds and publishes the site on every push.
 
 ---
 
-## Three portals — one website
+## Who uses it
 
-Everyone logs in on the same page; the site shows each person only what their role needs.
-
-| | Client | Staff (stylist) | Owner |
+| | **Client** | **Staff** | **Owner** |
 |---|---|---|---|
-| Lands on | `/account` — My appointments | `/staff` — My schedule | `/owner` — Dashboard |
-| Book | for themselves | for a walk-in / phone client | for a walk-in / phone client |
-| Sees appointments | only their own | only ones assigned to them | everyone's |
-| Change status (confirm / done / no-show) | — | own appointments | all |
-| Reschedule / cancel | own, up to 12 h before | own clients, any time | any, any time |
-| Delete appointments | own cancelled/past ones | — (cancel instead) | any |
-| Time off | — | own | anyone's |
-| Team, staff logins, working days | — | — | ✓ |
-| Clients list & history | — | — | ✓ |
-| Services & prices | — | — | ✓ |
-| Revenue & business stats | — | — | ✓ |
+| Login page | `/login` (client login) | `/team` → **Staff** | `/team` → **Owner** |
+| Sign up | `/register` — anyone | `/team/join` — needs the **staff code** | `/team/setup` — once, needs `SETUP_CODE` |
+| At every login | email + password | email + password + **staff code** | email + password |
+| Can do | book, reschedule/cancel own bookings, **send feedback** | own schedule, confirm/done/no-show, move/cancel own bookings, time off, book walk-ins, read own reviews | everything: dashboard, all appointments, team, **staff code**, clients, feedback, services |
 
-Every rule above is enforced **on the server** (API routes re-check the role from the database on every request), not just hidden in the menu.
+**Staff code:** the owner sets it on **Owner → Team**. Staff need it to create an account *and* every time they log in.
+When the owner changes it, **every staff member is logged out** immediately (useful when someone leaves). Staff sessions also expire after 12 hours.
 
-## What it does
+**Feedback:** clients rate a finished visit (1–5 ★) or send general feedback from **Feedback** in their menu.
+The owner sees all of it, can reply, and can choose reviews to **show on the home page** (first name + initial only). Staff see reviews about their own visits, without the client's contact details.
 
-**Owner portal**
-- **Dashboard**: revenue this month (completed visits), booked revenue ahead, today / next 7 days / upcoming counts, new clients, no-show rate, % booked online, at-home visits, today's schedule, team performance, top services
-- **Appointments**: by day, upcoming, or last 60 days; filter by stylist and status; change status, move, delete
-- **Team**: add staff (creates their login), set working days, edit bio/title, reset passwords, deactivate leavers (blocks login instantly; history kept), manage everyone's time off
-- **Clients**: registered clients + walk-ins, with visits, upcoming, total spent, last visit, no-shows and full history; search
-- **Services**: add / edit / hide services, prices, durations, at-home availability
-
-**Staff portal**
-- **My schedule**: day view (← →) and upcoming list of *their own* appointments, with client phone, services, notes, home-visit address + directions link
-- One-tap **Confirm / Done / No-show / Move / Cancel**
-- **Time off**: block whole days or hours (can't block time that already has bookings)
-- **Book a client** (walk-ins can be booked right away — no 2-hour notice)
-
-**For clients**
-- Create an account and log in (passwords hashed with bcrypt, sessions in secure httpOnly cookies)
-- Book an appointment:
-  - pick one or more services from the menu, **or type in a custom service** (the stylist quotes it at the visit)
-  - choose **In studio** or **At my home** (address + postal code checked against the service area; $25 travel fee)
-  - choose a stylist, or "any available"
-  - see **live available times** only (no double-booking, respects opening hours, 2-hour notice, travel time between home visits)
-  - add notes (allergies, buzzer code…)
-- **My appointments**: upcoming / past & cancelled tabs
-  - **Reschedule** (up to 12 h before, max 3 times)
-  - **Cancel** (up to 12 h before)
-  - **Delete** cancelled or past appointments from history
-  - **Add to calendar** (.ics file for Google / Apple / Outlook)
-- Edit profile and change password (everyone — also staff and owner under **Settings**)
-- Confirmation emails for booking / reschedule / cancel (printed to the console locally; real email via Resend in production)
-- Only stylists who **work that day** and aren't on **time off** are offered
-
-Business rules (opening hours, notice period, travel fee, service area, cancellation window) live in one file: [`src/lib/config.ts`](src/lib/config.ts).
+Everything is enforced **on the server** (every API route re-checks the user's role in the database), not just hidden in the menu.
 
 ---
 
 ## Run it on your computer
 
-You need **Node.js 20+** (https://nodejs.org) and **Git** (https://git-scm.com).
+Needs **Node.js 20+** and **Git**.
 
 ```bash
 cd salon-booking
 npm install
 ```
 
-Create your settings file (first time only) — copy `.env.example` to `.env` and fill in `AUTH_SECRET` and `OWNER_PASSWORD` (and `STAFF_PASSWORD` if you want demo staff logins):
+Create your local secrets (first time only): copy `.env.example` to **both** `.env` and `.dev.vars`, then fill in `AUTH_SECRET` and `SETUP_CODE`.
 
 ```bash
 copy .env.example .env
 ```
 
-Generate a strong `AUTH_SECRET`:
-
 ```bash
-node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"
+copy .env.example .dev.vars
 ```
 
-Create the database and add the services, team and owner account:
+Create the local database (tables + starter services/team). Data is stored in `%USERPROFILE%\.salon-booking-dev`:
 
 ```bash
 npm run setup
@@ -94,137 +56,88 @@ Start the site:
 npm run dev
 ```
 
-Open http://localhost:3000.
-- **Client**: click **Book now** → create an account → lands on **My appointments**.
-- **Owner**: log in with `OWNER_EMAIL` / `OWNER_PASSWORD` from `.env` → lands on the **Owner dashboard**.
-- **Staff**: `aiko@salon.test`, `marco@salon.test` or `priya@salon.test` with `STAFF_PASSWORD` from `.env` (demo only) → lands on **My schedule**. Real staff are added by the owner under **Team**.
-
-Other commands:
+Open http://localhost:3000, go to **/team/setup** and create the owner account with your `SETUP_CODE`. Then on **Owner → Team** generate a staff code.
 
 | Command | What it does |
 |---|---|
-| `npm test` | Runs the availability/time-slot tests |
-| `npm run lint` | Type-checks the whole project |
-| `npm run build` | Production build (what Vercel runs) |
-| `npx prisma studio` | Opens a visual editor for the database |
+| `npm run dev` | Local site with hot reload (uses the local D1 database) |
+| `npm run preview` | Builds for Cloudflare and runs it in Cloudflare's real runtime locally |
+| `npm test` | Time-slot / availability tests |
+| `npm run lint` | Type-checks the project |
+| `npm run db:migrate:local` | Applies new SQL files in `migrations/` to the local database |
+| `npm run db:sql:local "SELECT * FROM users"` | Run SQL on the local database |
 
 ---
 
-## Put it on GitHub
+## Deploy on Cloudflare (connected to GitHub)
 
-1. On github.com create a **new private repository** (e.g. `salon-booking`). Don't add a README.
-2. In the `salon-booking` folder:
+### 1. Create the database
+Cloudflare dashboard → **Storage & Databases → D1 → Create database** → name it **`salon-db`** (location: Western North America).
+Copy its **Database ID** and put it in `wrangler.jsonc` → `d1_databases[0].database_id`, then commit and push.
 
-```bash
-git init
-```
+### 2. Connect the GitHub repo
+**Workers & Pages → Create → Import a repository** → connect GitHub → pick **salon-booking**. Settings:
 
-```bash
-git add .
-```
+| Setting | Value |
+|---|---|
+| Project name | `salon-booking` (must match `name` in `wrangler.jsonc`) |
+| Build command | `npx opennextjs-cloudflare build` |
+| Deploy command | `npx wrangler d1 migrations apply salon-db --remote && npx opennextjs-cloudflare deploy` |
+| Root directory | `/` |
 
-```bash
-git commit -m "Initial salon booking website"
-```
+Click **Deploy**. Every push to `main` now rebuilds and publishes automatically, and new database migrations are applied first.
 
-```bash
-git branch -M main
-```
+### 3. Add the secrets
+**salon-booking → Settings → Variables and Secrets** → add as type **Secret**:
 
-```bash
-git remote add origin https://github.com/YOUR-ACCOUNT/salon-booking.git
-```
+| Name | Value |
+|---|---|
+| `AUTH_SECRET` | long random string (48+ characters) |
+| `SETUP_CODE` | private one-time code for creating the owner account |
+| `RESEND_API_KEY`, `EMAIL_FROM` | optional, for real confirmation emails via resend.com |
 
-```bash
-git push -u origin main
-```
+Then **Deployments → Retry/Redeploy** so the secrets are picked up.
 
-`.env` and the local database are in `.gitignore`, so **secrets are never uploaded**. Double-check with `git status` before your first push.
-
----
-
-## Deploy to Vercel (production)
-
-SQLite files don't persist on Vercel, so production uses a hosted **Postgres** database.
-
-1. **Create the database** — in Vercel: *Storage → Create → Neon (Postgres)*, region close to Vancouver (e.g. `us-west-2` / Oregon). Copy its connection string.
-2. **Switch Prisma to Postgres** — in `prisma/schema.prisma` change:
-   ```prisma
-   provider = "postgresql"
-   ```
-   Commit and push.
-3. **Create the tables + seed data** (once, from your computer) — temporarily put the Neon URL in your `.env` as `DATABASE_URL`, then:
-
-```bash
-npm run setup
-```
-
-   Afterwards put your local `DATABASE_URL` back if you want to keep developing on SQLite (you'll need to switch the provider back too — or simply use a second free Neon database for development).
-4. **Import the project** — Vercel → *Add New → Project* → pick the GitHub repo. Framework: Next.js (auto-detected).
-5. **Environment variables** (Vercel → Project → Settings → Environment Variables):
-
-   | Name | Value |
-   |---|---|
-   | `DATABASE_URL` | Neon connection string (pooled) |
-   | `AUTH_SECRET` | a **new** random 48-byte string (don't reuse your local one) |
-   | `RESEND_API_KEY` | optional, from resend.com, for real emails |
-   | `EMAIL_FROM` | e.g. `Maple & Mane <bookings@yourdomain.com>` (domain verified in Resend) |
-
-6. **Deploy.** Every push to `main` redeploys automatically; pull requests get preview URLs.
-7. Add the salon's domain in Vercel → *Domains* (HTTPS is automatic).
+### 4. Create the owner, then the team
+1. Open `https://<your-site>.workers.dev/team/setup` → create the owner account with `SETUP_CODE` (works only once).
+2. **Owner → Team → Generate a code** → give it privately to staff.
+3. Staff create their accounts at `/team/join`.
+4. Optional: add your own domain under **salon-booking → Settings → Domains & Routes**.
 
 ---
 
-## Security checklist (already built in)
+## Security built in
 
-- Passwords hashed with **bcrypt (cost 12)**; never stored or logged in plain text
-- Sessions are signed JWTs in **httpOnly, Secure, SameSite=Lax** cookies (not readable by page scripts)
-- Every API route checks login and **ownership** — clients can only see/change their own appointments; admin routes re-check the role from the database
-- **Input validation** on every request with Zod (lengths, formats, postal codes, dates)
-- **Origin check** on all write requests + SameSite cookies → CSRF protection
-- **Rate limiting** on login, sign-up and booking; generic login error so emails can't be enumerated
-- **No open redirects** after login; React escapes output (XSS)
-- Booking runs in a **serializable database transaction** so two people can't grab the same slot
-- Security headers: Content-Security-Policy, HSTS, X-Frame-Options (no clickjacking), nosniff, Referrer-Policy
-- Secrets only in environment variables; `.env` is git-ignored
-
-**Before going live with real clients**
-- Use a long unique `OWNER_PASSWORD` and a fresh `AUTH_SECRET` in production, and leave `STAFF_PASSWORD` empty (add real staff from **Owner → Team**; each one changes their temporary password under **Settings**)
-- For high traffic, move rate limiting to a shared store (Upstash Redis) — see `src/lib/rate-limit.ts`
-- Add a privacy policy page (BC's **PIPA** applies to personal info like names, phones and home addresses)
-- Turn on GitHub **Dependabot** alerts and 2-factor auth on GitHub and Vercel
+- Passwords hashed with **PBKDF2-SHA256 (100,000 rounds, random salt)** — never stored in plain text
+- Sessions: signed tokens in **httpOnly, Secure, SameSite=Lax** cookies; staff sessions are tied to the current staff code and last 12 h
+- Separate client and team logins; each login refuses the wrong kind of account
+- Owner setup closes permanently once an owner exists; codes are compared in constant time and are not case-sensitive
+- Every API route checks login, role and ownership (clients only see their own bookings, staff only theirs)
+- Input validation (Zod) on every request, rate limiting on logins, sign-ups, staff code attempts and bookings
+- CSRF protection (origin check + SameSite cookies), no open redirects, security headers (CSP, HSTS, X-Frame-Options…)
+- Double-booking guard: after saving, the booking is re-checked; if two people grabbed the same slot, the later one is asked to pick again
+- Secrets only in Cloudflare secrets / local `.env` + `.dev.vars` (all git-ignored)
 
 ---
 
 ## Project structure
 
 ```
-prisma/
-  schema.prisma          database tables (User, Service, Stylist, Appointment, AppointmentItem)
-  seed.ts                services, stylists, admin account
+migrations/            SQL for the D1 database (0001 tables, 0002 starter menu & team)
+wrangler.jsonc         Cloudflare Worker + D1 configuration
+open-next.config.ts    Next.js → Cloudflare adapter
 src/
-  middleware.ts          redirects logged-out users / non-admins
-  lib/
-    config.ts            ← salon name, hours, rules, travel fee, service area
-    availability.ts      free-slot calculation
-    bookings.ts          booking logic shared by API routes
-    auth.ts, session-token.ts   login sessions
-    validation.ts        all input rules
+  db/schema.ts         tables (users, services, stylists, time_off, appointments, appointment_items, feedback, settings)
+  middleware.ts        sends each role to its own portal / login
+  lib/                 auth, sessions, staff code, passwords, bookings, availability, feedback, stats, validation
   app/
-    page.tsx             home
-    services/            service menu
-    book/                booking page
-    account/             my appointments, reschedule, profile
-    owner/               owner portal: dashboard, appointments, team, clients, services
-    staff/               staff portal: my schedule, time off, move appointment
-    settings/            profile + password (all roles)
-    api/                 backend endpoints (auth, services, availability, appointments)
-  components/            UI pieces (BookingForm, SlotPicker, AccountView, AdminDashboard…)
-tests/                   unit tests
+    page.tsx           home page
+    login, register    CLIENT login / sign-up
+    team/              TEAM login, staff join (/team/join), owner setup (/team/setup)
+    account/           client: appointments, feedback, reschedule
+    staff/             staff: schedule, time off, reviews
+    owner/             owner: dashboard, appointments, team (+ staff code), clients, feedback, services
+    api/               backend endpoints
+  components/          UI (forms, boards, cards, icons)
+tests/                 unit tests
 ```
-
-## Ideas for next versions
-- SMS reminders (Twilio) the day before
-- Online deposits / no-show fee with Stripe
-- Stylist logins with their own schedules and days off
-- Waitlist when a day is full; Google reviews link after a completed visit

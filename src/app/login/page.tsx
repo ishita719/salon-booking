@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
-import AuthForm from "@/components/AuthForm";
+import ClientAuth from "@/components/ClientAuth";
 
-export const metadata: Metadata = { title: "Log in" };
+export const metadata: Metadata = { title: "Client login" };
 
 export default function LoginPage() {
-  return <AuthForm mode="login" />;
+  return <ClientAuth mode="login" />;
 }

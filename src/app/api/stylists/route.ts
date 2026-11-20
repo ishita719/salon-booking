@@ -1,12 +1,15 @@
+import { asc, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
+import { getDb, schema } from "@/db";
 import { route } from "@/lib/api";
-import { prisma } from "@/lib/db";
+
+const { stylists } = schema;
 
 export const GET = route(async () => {
-  const stylists = await prisma.stylist.findMany({
-    where: { active: true },
-    select: { id: true, name: true, title: true, bio: true },
-    orderBy: { name: "asc" },
-  });
-  return NextResponse.json({ stylists });
+  const list = await getDb()
+    .select({ id: stylists.id, name: stylists.name, title: stylists.title, bio: stylists.bio })
+    .from(stylists)
+    .where(eq(stylists.active, true))
+    .orderBy(asc(stylists.name));
+  return NextResponse.json({ stylists: list });
 });

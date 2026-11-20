@@ -1,14 +1,16 @@
-import type { Prisma } from "@prisma/client";
+import { and, asc, count, desc, eq, gte, inArray, isNull, lte, SQL } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { getDb, schema } from "@/db";
 import { ApiError, clientIp, isTeam, requireUser, route } from "@/lib/api";
-import { appointmentInclude, buildItems, claimSlot, serialize, summaryText } from "@/lib/bookings";
+import { buildItems, hydrate, loadAppointment, lostRace, pickStylistForSlot, serialize, summaryText } from "@/lib/bookings";
 import { ACTIVE_STATUSES, ALL_STATUSES, SALON } from "@/lib/config";
-import { prisma } from "@/lib/db";
 import { sendEmail } from "@/lib/email";
 import { rateLimit } from "@/lib/rate-limit";
 import { addDays, salonNow } from "@/lib/time";
 import { bookingSchema, dateSchema } from "@/lib/validation";
+
+const { appointments, appointmentItems, users } = schema;
 
 const listQuery = z.object({
   date: dateSchema.optional(),
@@ -17,8 +19,8 @@ const listQuery = z.object({
   status: z.enum(ALL_STATUSES).optional(),
   upcoming: z.enum(["1"]).optional(),
   // owner-only filters
-  stylistId: z.string().max(40).optional(),
-  clientId: z.string().max(40).optional(),
+  stylistId: z.string().max(64).optional(),
+  clientId: z.string().max(64).optional(),
   guestPhone: z.string().max(30).optional(),
 });
 
@@ -29,101 +31,111 @@ export const GET = route(async (req) => {
   const q = listQuery.parse(Object.fromEntries(req.nextUrl.searchParams));
   const today = salonNow().date;
 
-  const where: Prisma.AppointmentWhereInput = {};
-  if (user.role === "CUSTOMER") where.userId = user.id;
-  else if (user.role === "STAFF") where.stylistId = user.stylistId ?? "__none__";
+  const conds: SQL[] = [];
+  if (user.role === "CUSTOMER") conds.push(eq(appointments.userId, user.id));
+  else if (user.role === "STAFF") conds.push(eq(appointments.stylistId, user.stylistId ?? "__none__"));
   else {
-    if (q.stylistId) where.stylistId = q.stylistId;
-    if (q.clientId) where.userId = q.clientId;
-    if (q.guestPhone) Object.assign(where, { userId: null, guestPhone: q.guestPhone });
+    if (q.stylistId) conds.push(eq(appointments.stylistId, q.stylistId));
+    if (q.clientId) conds.push(eq(appointments.userId, q.clientId));
+    if (q.guestPhone) conds.push(isNull(appointments.userId), eq(appointments.guestPhone, q.guestPhone));
   }
-  if (q.date) where.date = q.date;
-  else if (q.from || q.to) where.date = { gte: q.from ?? "0000-00-00", lte: q.to ?? "9999-12-31" };
-  if (q.status) where.status = q.status;
   if (q.upcoming) {
-    where.date = { gte: today, lte: addDays(today, 90) };
-    where.status = { in: [...ACTIVE_STATUSES] };
+    conds.push(gte(appointments.date, today), lte(appointments.date, addDays(today, 90)), inArray(appointments.status, [...ACTIVE_STATUSES]));
+  } else {
+    if (q.date) conds.push(eq(appointments.date, q.date));
+    else if (q.from || q.to) conds.push(gte(appointments.date, q.from ?? "0000-00-00"), lte(appointments.date, q.to ?? "9999-12-31"));
+    if (q.status) conds.push(eq(appointments.status, q.status));
   }
 
-  const appointments = await prisma.appointment.findMany({
-    where,
-    include: appointmentInclude,
-    orderBy: [{ date: user.role === "CUSTOMER" ? "desc" : "asc" }, { startMin: "asc" }],
-    take: 500,
-  });
-  return NextResponse.json({ appointments: appointments.map(serialize) });
+  const db = getDb();
+  const rows = await db
+    .select()
+    .from(appointments)
+    .where(conds.length ? and(...conds) : undefined)
+    .orderBy(user.role === "CUSTOMER" ? desc(appointments.date) : asc(appointments.date), asc(appointments.startMin))
+    .limit(500);
+  return NextResponse.json({ appointments: (await hydrate(db, rows)).map(serialize) });
 });
 
 // POST: create a booking. Clients book for themselves; staff/owner book on behalf of a client.
 export const POST = route(async (req) => {
   const user = await requireUser();
-  rateLimit(`book:${user.id}:${clientIp(req)}`, isTeam(user) ? 200 : 15, 60 * 60 * 1000);
-  const data = bookingSchema.parse(await req.json());
   const team = isTeam(user);
+  rateLimit(`book:${user.id}:${clientIp(req)}`, team ? 200 : 15, 60 * 60 * 1000);
+  const data = bookingSchema.parse(await req.json());
+  const db = getDb();
 
   // Who the appointment is for.
-  let owner: { userId: string | null; guestName?: string; guestPhone?: string; guestEmail?: string | null; email: string | null; name: string };
+  let forWho: { userId: string | null; guestName?: string; guestPhone?: string; guestEmail?: string | null; email: string | null; name: string };
   if (team) {
     if (!data.client) throw new ApiError(400, "Enter the client's name and phone number.");
     const email = data.client.email || null;
-    const registered = email ? await prisma.user.findFirst({ where: { email, role: "CUSTOMER", active: true } }) : null;
-    owner = registered
+    const registered = email
+      ? await db.query.users.findFirst({ where: and(eq(users.email, email), eq(users.role, "CUSTOMER"), eq(users.active, true)) })
+      : undefined;
+    forWho = registered
       ? { userId: registered.id, email: registered.email, name: registered.name }
       : { userId: null, guestName: data.client.name, guestPhone: data.client.phone, guestEmail: email, email, name: data.client.name };
   } else {
     // Limit how many open bookings one client account can hold (stops spam / slot hoarding).
-    const openCount = await prisma.appointment.count({
-      where: { userId: user.id, status: { in: [...ACTIVE_STATUSES] }, date: { gte: salonNow().date } },
-    });
-    if (openCount >= 5) throw new ApiError(400, "You already have 5 upcoming appointments. Please contact the salon to book more.");
-    owner = { userId: user.id, email: user.email, name: user.name };
+    const [{ n }] = await db
+      .select({ n: count() })
+      .from(appointments)
+      .where(and(eq(appointments.userId, user.id), inArray(appointments.status, [...ACTIVE_STATUSES]), gte(appointments.date, salonNow().date)));
+    if (n >= 5) throw new ApiError(400, "You already have 5 upcoming appointments. Please contact the salon to book more.");
+    forWho = { userId: user.id, email: user.email, name: user.name };
   }
 
-  const priced = await buildItems(data.serviceIds, data.customServices, data.locationType);
+  const priced = await buildItems(db, data.serviceIds, data.customServices, data.locationType);
+  const stylistId = await pickStylistForSlot(db, {
+    date: data.date,
+    startMin: data.startMin,
+    durationMin: priced.durationMin,
+    locationType: data.locationType,
+    stylistId: data.stylistId,
+    minNoticeMin: team ? 0 : undefined,
+  });
 
-  // Check + insert in one serializable transaction so two people can't grab the same slot.
-  const created = await prisma.$transaction(
-    async (tx) => {
-      const stylistId = await claimSlot(tx, {
-        date: data.date,
-        startMin: data.startMin,
-        durationMin: priced.durationMin,
-        locationType: data.locationType,
-        stylistId: data.stylistId,
-        minNoticeMin: team ? 0 : undefined,
-      });
-      return tx.appointment.create({
-        data: {
-          userId: owner.userId,
-          guestName: owner.guestName ?? null,
-          guestPhone: owner.guestPhone ?? null,
-          guestEmail: owner.guestEmail ?? null,
-          source: team ? "STAFF" : "ONLINE",
-          stylistId,
-          date: data.date,
-          startMin: data.startMin,
-          endMin: data.startMin + priced.durationMin,
-          locationType: data.locationType,
-          address: data.address ?? null,
-          postalCode: data.postalCode ?? null,
-          notes: data.notes || null,
-          subtotalCents: priced.subtotalCents,
-          travelFeeCents: priced.travelFeeCents,
-          hasCustom: priced.hasCustom,
-          items: { create: priced.items },
-        },
-        include: appointmentInclude,
-      });
-    },
-    { isolationLevel: "Serializable" },
-  );
+  const id = crypto.randomUUID();
+  const now = new Date();
+  // Appointment + its line items are written together in one atomic batch.
+  await db.batch([
+    db.insert(appointments).values({
+      id,
+      userId: forWho.userId,
+      guestName: forWho.guestName ?? null,
+      guestPhone: forWho.guestPhone ?? null,
+      guestEmail: forWho.guestEmail ?? null,
+      source: team ? "STAFF" : "ONLINE",
+      stylistId,
+      date: data.date,
+      startMin: data.startMin,
+      endMin: data.startMin + priced.durationMin,
+      locationType: data.locationType,
+      address: data.address ?? null,
+      postalCode: data.postalCode ?? null,
+      notes: data.notes || null,
+      subtotalCents: priced.subtotalCents,
+      travelFeeCents: priced.travelFeeCents,
+      hasCustom: priced.hasCustom,
+      createdAt: now,
+      updatedAt: now,
+    }),
+    db.insert(appointmentItems).values(priced.items.map((i) => ({ ...i, appointmentId: id }))),
+  ]);
 
-  const dto = serialize(created);
-  if (owner.email) {
+  // Two people may have picked the same slot at the same moment: the first one saved keeps it.
+  if (await lostRace(db, { id, stylistId, date: data.date, startMin: data.startMin, endMin: data.startMin + priced.durationMin, locationType: data.locationType, createdAt: now })) {
+    await db.delete(appointments).where(eq(appointments.id, id));
+    throw new ApiError(409, "Sorry, someone just booked that time. Please pick another.");
+  }
+
+  const dto = serialize((await loadAppointment(db, id))!);
+  if (forWho.email) {
     await sendEmail(
-      owner.email,
+      forWho.email,
       `Booking confirmed — ${dto.dateLabel}`,
-      `Hi ${owner.name},\n\nThanks for booking with ${SALON.name}!\n\n${summaryText(dto)}\n\nNeed to change it? Call us at ${SALON.phone}${owner.userId ? " or manage it from your account" : ""}.`,
+      `Hi ${forWho.name},\n\nThanks for booking with ${SALON.name}!\n\n${summaryText(dto)}\n\nNeed to change it? Call us at ${SALON.phone}${forWho.userId ? " or manage it from your account" : ""}.`,
     );
   }
   return NextResponse.json({ appointment: dto }, { status: 201 });

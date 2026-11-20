@@ -28,30 +28,74 @@ export const passwordSchema = z
   .regex(/[A-Za-z]/, "Password needs at least one letter")
   .regex(/[0-9]/, "Password needs at least one number");
 
+// Client sign-up (/register). Always creates a CLIENT account.
 export const registerSchema = z.object({
   name: trimmed(2, 80, "Name"),
   email: emailSchema,
   phone: phoneSchema,
   password: passwordSchema,
-  // "I am a" on the sign-up page. STAFF waits for owner approval; OWNER needs the owner access code.
-  role: z.enum(["CUSTOMER", "STAFF", "OWNER"]).default("CUSTOMER"),
-  ownerCode: z.string().max(200).optional(),
 });
 
-export const staffRequestSchema = z.object({
-  action: z.enum(["approve", "reject"]),
-  title: z.string().trim().min(2).max(60).optional(),
-  workDays: z
-    .array(z.number().int().min(0).max(6))
-    .max(7)
-    .transform((d) => [...new Set(d)].sort().join(","))
-    .optional(),
-});
-
+// Client login (/login).
 export const loginSchema = z.object({
   email: emailSchema,
   password: z.string().min(1, "Password is required").max(100),
-  role: z.enum(["CUSTOMER", "STAFF", "OWNER"]).optional(), // "I am a" dropdown on the login page
+});
+
+const codeField = (label: string) => z.string({ required_error: `${label} is required` }).trim().min(4, `Enter the ${label.toLowerCase()}`).max(64);
+
+// Team login (/team): owner = email + password; staff = email + password + staff code.
+export const teamLoginSchema = z
+  .object({
+    as: z.enum(["OWNER", "STAFF"]),
+    email: emailSchema,
+    password: z.string().min(1, "Password is required").max(100),
+    staffCode: z.string().trim().max(64).optional(),
+  })
+  .superRefine((v, ctx) => {
+    if (v.as === "STAFF" && (!v.staffCode || v.staffCode.length < 4)) ctx.addIssue({ code: "custom", message: "Enter the staff code from the owner" });
+  });
+
+// Staff sign-up (/team/join) — needs the owner's staff code.
+export const staffJoinSchema = z.object({
+  name: trimmed(2, 80, "Name"),
+  email: emailSchema,
+  phone: phoneSchema,
+  password: passwordSchema,
+  staffCode: codeField("Staff code"),
+});
+
+// First-time owner setup (/team/setup) — only works while no owner exists, and needs SETUP_CODE.
+export const ownerSetupSchema = z.object({
+  name: trimmed(2, 80, "Name"),
+  email: emailSchema,
+  phone: phoneSchema,
+  password: passwordSchema,
+  setupCode: codeField("Setup code"),
+});
+
+// Owner sets the staff code (or asks for a random one).
+export const staffCodeSchema = z.object({
+  code: z
+    .string()
+    .trim()
+    .min(6, "Use at least 6 characters")
+    .max(32, "Use at most 32 characters")
+    .regex(/^[A-Za-z0-9-]+$/, "Use letters, numbers and dashes only")
+    .optional(),
+  generate: z.boolean().optional(),
+});
+
+// Client feedback.
+export const feedbackSchema = z.object({
+  rating: z.number({ required_error: "Choose a rating" }).int().min(1, "Choose a rating").max(5),
+  comment: z.string().trim().max(1000, "Please keep it under 1000 characters").default(""),
+  appointmentId: z.string().min(1).max(64).nullable().optional(),
+});
+
+export const feedbackUpdateSchema = z.object({
+  isPublic: z.boolean().optional(),
+  ownerReply: z.string().trim().max(1000).nullable().optional(),
 });
 
 export const profileSchema = z.object({

@@ -21,3 +21,9 @@ prisma/dev/
 .vercel
 npm-debug.log*
 .DS_Store
+
+# Cloudflare
+.open-next/
+.wrangler/
+.dev.vars
+.dev.vars.*

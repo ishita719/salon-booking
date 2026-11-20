@@ -1,7 +1,7 @@
 import { ApiError, requireUser, route } from "@/lib/api";
-import { canAccess } from "@/lib/bookings";
+import { canAccess, loadAppointment } from "@/lib/bookings";
 import { SALON } from "@/lib/config";
-import { prisma } from "@/lib/db";
+import { getDb } from "@/db";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -14,7 +14,7 @@ const esc = (s: string) => s.replace(/[\\;,]/g, (c) => `\\${c}`).replace(/\r?\n/
 export const GET = route<Ctx>(async (_req, { params }) => {
   const user = await requireUser();
   const id = (await params).id;
-  const a = await prisma.appointment.findUnique({ where: { id }, include: { items: true, stylist: true } });
+  const a = await loadAppointment(getDb(), id);
   if (!a || !canAccess(user, a)) throw new ApiError(404, "Appointment not found.");
 
   const where = a.locationType === "HOME" ? `${a.address}, ${a.postalCode}` : SALON.address;

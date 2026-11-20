@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import StaffSchedule from "@/components/StaffSchedule";
 import { pageUser } from "@/lib/auth";
 import { worksOn } from "@/lib/bookings";
-import { prisma } from "@/lib/db";
+import { eq } from "drizzle-orm";
+import { getDb, schema } from "@/db";
 import { salonNow } from "@/lib/time";
 
 export const metadata: Metadata = { title: "My schedule" };
@@ -11,7 +12,7 @@ export const dynamic = "force-dynamic";
 export default async function StaffPage() {
   const user = await pageUser(["STAFF"]);
   const today = salonNow().date;
-  const stylist = user.stylistId ? await prisma.stylist.findUnique({ where: { id: user.stylistId } }) : null;
+  const stylist = user.stylistId ? await getDb().query.stylists.findFirst({ where: eq(schema.stylists.id, user.stylistId) }) : null;
   if (!stylist) {
     return (
       <div className="container section">

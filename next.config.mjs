@@ -1,3 +1,11 @@
+import { initOpenNextCloudflareForDev } from "@opennextjs/cloudflare";
+import { homedir } from "node:os";
+import { join } from "node:path";
+
+// Lets `next dev` use Cloudflare bindings (the local D1 database) exactly like production.
+// Local data is kept in ~/.salon-booking-dev (same place as `npm run db:migrate:local`).
+initOpenNextCloudflareForDev({ persist: { path: join(homedir(), ".salon-booking-dev", "v3") } });
+
 const isDev = process.env.NODE_ENV !== "production";
 
 // Security headers applied to every response.

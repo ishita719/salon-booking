@@ -1,101 +1,199 @@
+import { asc, eq } from "drizzle-orm";
 import Link from "next/link";
+import { CategoryIcon, HeroArt } from "@/components/Icons";
+import Stars from "@/components/Stars";
+import { getDb, schema } from "@/db";
 import { BOOKING_RULES, HOME_VISITS, HOURS, SALON } from "@/lib/config";
-import { prisma } from "@/lib/db";
-import { formatDuration, formatMoney, formatTime } from "@/lib/time";
+import { publicReviews } from "@/lib/feedback";
+import { formatMoney, formatTime, salonNow, weekdayOf } from "@/lib/time";
 
 export const dynamic = "force-dynamic";
 
 const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+const initials = (name: string) => name.split(/\s+/).map((p) => p[0]).slice(0, 2).join("").toUpperCase();
 
 export default async function Home() {
-  const [featured, stylists] = await Promise.all([
-    prisma.service.findMany({ where: { active: true }, orderBy: { priceCents: "asc" }, take: 6 }),
-    prisma.stylist.findMany({ where: { active: true }, orderBy: { name: "asc" } }),
+  const db = getDb();
+  const [services, team, reviews, ratings] = await Promise.all([
+    db.select().from(schema.services).where(eq(schema.services.active, true)).orderBy(asc(schema.services.priceCents)),
+    db.select().from(schema.stylists).where(eq(schema.stylists.active, true)).orderBy(asc(schema.stylists.name)),
+    publicReviews(db, 6),
+    db.select({ rating: schema.feedback.rating }).from(schema.feedback),
   ]);
+
+  const categories = [...new Set(services.map((s) => s.category))].map((cat) => {
+    const list = services.filter((s) => s.category === cat);
+    return { cat, count: list.length, from: Math.min(...list.map((s) => s.priceCents)), names: list.slice(0, 3).map((s) => s.name) };
+  });
+  const avg = ratings.length ? ratings.reduce((t, r) => t + r.rating, 0) / ratings.length : null;
+  const todayIdx = weekdayOf(salonNow().date);
 
   return (
     <>
+      {/* ---------- Hero ---------- */}
       <section className="hero">
-        <div className="container">
-          <div className="eyebrow">Vancouver, BC · In-studio & at-home</div>
-          <h1>Look good. Feel at home.</h1>
-          <p className="lead">{SALON.tagline} Book online in under a minute and change it any time from your account.</p>
-          <div className="row" style={{ marginTop: 24 }}>
-            <Link href="/book" className="btn btn-lg">Book an appointment</Link>
-            <Link href="/services" className="btn btn-outline btn-lg">View services</Link>
+        <div className="container hero-grid">
+          <div>
+            <div className="eyebrow">Vancouver · In-studio &amp; at-home</div>
+            <h1>
+              Beauty that fits <span>your life</span>, not the other way around.
+            </h1>
+            <p className="lead">{SALON.tagline} Book in under a minute, and change your plans any time from your account.</p>
+            <div className="hero-cta">
+              <Link href="/book" className="btn btn-lg">Book an appointment</Link>
+              <Link href="/services" className="btn btn-outline btn-lg">Explore services</Link>
+            </div>
+            <div className="hero-trust">
+              <div><strong>{avg ? avg.toFixed(1) : "5.0"}★</strong>{ratings.length ? `${ratings.length} client review${ratings.length > 1 ? "s" : ""}` : "Loved by locals"}</div>
+              <div><strong>{team.length}</strong>expert stylists</div>
+              <div><strong>{services.length}</strong>services</div>
+            </div>
+          </div>
+          <div className="hero-art">
+            <div className="ring" />
+            <div className="orb"><HeroArt /></div>
+            <div className="float-card fc-1"><span className="ic">✂</span><div><strong>Online booking</strong><span className="muted">24/7, real-time slots</span></div></div>
+            <div className="float-card fc-2"><span className="ic">⌂</span><div><strong>We come to you</strong><span className="muted">+{formatMoney(HOME_VISITS.travelFeeCents)} travel</span></div></div>
+            <div className="float-card fc-3"><span className="ic" style={{ color: "var(--gold)" }}>★</span><div><strong>{avg ? avg.toFixed(1) : "5.0"} rating</strong><span className="muted">from happy clients</span></div></div>
           </div>
         </div>
       </section>
 
+      {/* ---------- Categories ---------- */}
       <section className="section">
         <div className="container">
-          <div className="grid">
-            <div className="card">
-              <h3>Book in seconds</h3>
-              <p className="muted">Pick services from our menu — or type in what you need — choose a stylist and a time that suits you.</p>
+          <div className="spread" style={{ alignItems: "flex-end", marginBottom: 28 }}>
+            <div className="section-head" style={{ marginBottom: 0 }}>
+              <div className="eyebrow">Our menu</div>
+              <h2>Everything you need, under one roof</h2>
             </div>
-            <div className="card">
-              <h3>We come to you</h3>
-              <p className="muted">
-                At-home visits across {HOME_VISITS.areaLabel}. Flat {formatMoney(HOME_VISITS.travelFeeCents)} travel fee.
-              </p>
-            </div>
-            <div className="card">
-              <h3>Plans change? No problem</h3>
-              <p className="muted">Reschedule or cancel online up to {BOOKING_RULES.changeCutoffHours} hours before your visit. Add it to your calendar in one click.</p>
+            <Link href="/services" className="btn btn-ghost">View full price list →</Link>
+          </div>
+          <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))" }}>
+            {categories.map((c) => (
+              <Link key={c.cat} href={`/services#${encodeURIComponent(c.cat)}`} className="cat-card">
+                <span className="cat-icon"><CategoryIcon category={c.cat} /></span>
+                <h3 style={{ margin: 0 }}>{c.cat}</h3>
+                <span className="small muted">{c.names.join(" · ")}</span>
+                <span className="from">From <strong style={{ color: "var(--text)" }}>{formatMoney(c.from)}</strong> · {c.count} service{c.count > 1 ? "s" : ""}</span>
+              </Link>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ---------- How it works ---------- */}
+      <section className="section" style={{ background: "var(--bg-tint)" }}>
+        <div className="container">
+          <div className="section-head center center">
+            <div className="eyebrow">How it works</div>
+            <h2>Booked in three easy steps</h2>
+          </div>
+          <div className="steps">
+            <div className="step"><h3>Choose your services</h3><p className="muted">Pick from our menu or type in exactly what you need — we&apos;ll quote it at your visit.</p></div>
+            <div className="step"><h3>Pick a time &amp; place</h3><p className="muted">See live availability for every stylist. Come to the studio or have us come to you.</p></div>
+            <div className="step"><h3>Relax — we&apos;ve got it</h3><p className="muted">Get a confirmation email, add it to your calendar, and reschedule up to {BOOKING_RULES.changeCutoffHours} h before.</p></div>
+          </div>
+        </div>
+      </section>
+
+      {/* ---------- At-home band ---------- */}
+      <section className="section">
+        <div className="container">
+          <div className="band">
+            <div className="band-grid">
+              <div>
+                <div className="eyebrow" style={{ color: "#f3d9a8" }}>Salon at your door</div>
+                <h2 style={{ color: "#fff" }}>Too busy to come in? We&apos;ll come to you.</h2>
+                <p className="lead">Cuts, styling, nails, facials and event makeup — in your home, office or hotel anywhere in {HOME_VISITS.areaLabel}.</p>
+                <Link href="/book" className="btn btn-light btn-lg" style={{ marginTop: 10 }}>Book a home visit</Link>
+              </div>
+              <ul>
+                <li>✓ Flat {formatMoney(HOME_VISITS.travelFeeCents)} travel fee</li>
+                <li>✓ Professional, sanitised kit</li>
+                <li>✓ Same stylists as in the studio</li>
+                <li>✓ Perfect for weddings &amp; events</li>
+              </ul>
             </div>
           </div>
         </div>
       </section>
 
-      <section className="section" style={{ paddingTop: 0 }}>
+      {/* ---------- Team ---------- */}
+      <section className="section" id="team">
         <div className="container">
-          <div className="spread">
-            <h2>Popular services</h2>
-            <Link href="/services">See full menu →</Link>
+          <div className="section-head center">
+            <div className="eyebrow">Meet the team</div>
+            <h2>Talented hands, warm hearts</h2>
           </div>
-          <div className="grid" style={{ marginTop: 12 }}>
-            {featured.map((s) => (
-              <div key={s.id} className="card-flat">
-                <div className="spread">
-                  <strong>{s.name}</strong>
-                  <strong>{formatMoney(s.priceCents)}</strong>
-                </div>
-                <div className="muted small">
-                  {formatDuration(s.durationMin)} · {s.homeAvailable ? "Salon or at home" : "Salon only"}
-                </div>
+          <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))" }}>
+            {team.map((s) => (
+              <div key={s.id} className="card team-card card-hover">
+                <div className="avatar">{initials(s.name)}</div>
+                <h3 style={{ marginBottom: 2 }}>{s.name}</h3>
+                <div className="badge badge-gold" style={{ marginBottom: 10 }}>{s.title}</div>
+                <p className="muted small" style={{ margin: 0 }}>{s.bio || "Here to make you look and feel your best."}</p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      <section className="section" style={{ paddingTop: 0 }}>
-        <div className="container grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))" }}>
-          <div className="card">
-            <h2>Our team</h2>
-            <div className="stack">
-              {stylists.map((s) => (
-                <div key={s.id}>
-                  <strong>{s.name}</strong> <span className="muted">— {s.title}</span>
-                  <div className="small muted">{s.bio}</div>
-                </div>
+      {/* ---------- Reviews ---------- */}
+      <section className="section" id="reviews" style={{ background: "var(--bg-tint)" }}>
+        <div className="container">
+          <div className="section-head center">
+            <div className="eyebrow">Kind words</div>
+            <h2>What our clients say</h2>
+            {avg && <p className="muted"><Stars rating={avg} size="1.2rem" /> &nbsp;{avg.toFixed(1)} average from {ratings.length} review{ratings.length > 1 ? "s" : ""}</p>}
+          </div>
+          {reviews.length === 0 ? (
+            <div className="card center" style={{ maxWidth: 560, margin: "0 auto" }}>
+              <p className="muted" style={{ marginBottom: 14 }}>Be one of our first reviewers — after your visit, leave feedback from your account.</p>
+              <Link href="/book" className="btn">Book your first visit</Link>
+            </div>
+          ) : (
+            <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))" }}>
+              {reviews.map((r) => (
+                <figure key={r.id} className="card quote" style={{ margin: 0 }}>
+                  <Stars rating={r.rating} />
+                  <p style={{ marginTop: 10 }}>{r.comment}</p>
+                  <figcaption className="small muted">— {r.name}{r.stylistName ? `, with ${r.stylistName}` : ""}</figcaption>
+                  {r.ownerReply && <p className="small" style={{ marginTop: 12, marginBottom: 0, padding: "10px 12px", background: "var(--surface-2)", borderRadius: 10 }}><strong>Salon reply:</strong> {r.ownerReply}</p>}
+                </figure>
               ))}
             </div>
-          </div>
+          )}
+        </div>
+      </section>
+
+      {/* ---------- Visit ---------- */}
+      <section className="section">
+        <div className="container dash-cols" style={{ gridTemplateColumns: "1fr 1fr" }}>
           <div className="card">
-            <h2>Hours</h2>
-            <table>
+            <div className="eyebrow">Opening hours</div>
+            <table className="hours-table">
               <tbody>
-                {[2, 3, 4, 5, 6, 0, 1].map((d) => (
-                  <tr key={d}>
-                    <td>{DAYS[d]}</td>
+                {[1, 2, 3, 4, 5, 6, 0].map((d) => (
+                  <tr key={d} className={d === todayIdx ? "today" : undefined}>
+                    <td>{DAYS[d]}{d === todayIdx ? " (today)" : ""}</td>
                     <td>{HOURS[d] ? `${formatTime(HOURS[d]!.open)} – ${formatTime(HOURS[d]!.close)}` : "Closed"}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
-            <p className="small muted" style={{ marginTop: 12 }}>{SALON.address} · {SALON.phone}</p>
+          </div>
+          <div className="card" style={{ display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+            <div>
+              <div className="eyebrow">Find us</div>
+              <h3>{SALON.name}</h3>
+              <p className="muted">{SALON.address}</p>
+              <p><a href={`tel:${SALON.phone}`}>{SALON.phone}</a><br /><a href={`mailto:${SALON.email}`}>{SALON.email}</a></p>
+            </div>
+            <div className="row">
+              <Link href="/book" className="btn">Book now</Link>
+              <Link href="/register" className="btn btn-outline">Create account</Link>
+            </div>
           </div>
         </div>
       </section>

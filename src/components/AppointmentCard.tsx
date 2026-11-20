@@ -54,6 +54,9 @@ export default function AppointmentCard({ a, onCancel, onDelete, busy }: Props) 
         {!a.isPast && a.status !== "CANCELLED" && (
           <a className="btn btn-sm btn-ghost" href={`/api/appointments/${a.id}/ics`}>Add to calendar</a>
         )}
+        {(a.status === "COMPLETED" || (a.isPast && a.isActive)) && (
+          <Link className="btn btn-sm btn-gold" href={`/account/feedback?appointment=${a.id}`}>★ Rate this visit</Link>
+        )}
         {removable && onDelete && <button className="btn btn-sm btn-ghost" disabled={busy} onClick={onDelete}>Delete</button>}
         {!a.canCancel && !a.isPast && a.status !== "CANCELLED" && (
           <span className="small muted">Within 12 h of your visit — please call us to make changes.</span>

@@ -2,7 +2,9 @@ import type { Metadata } from "next";
 import BookingForm from "@/components/BookingForm";
 import { pageUser } from "@/lib/auth";
 import { BOOKING_RULES, HOME_VISITS } from "@/lib/config";
-import { prisma } from "@/lib/db";
+import { asc, eq } from "drizzle-orm";
+import { getDb, schema } from "@/db";
+import { stylistOptions } from "@/lib/bookings";
 import { addDays, salonNow } from "@/lib/time";
 
 export const metadata: Metadata = { title: "Book an appointment" };
@@ -11,16 +13,18 @@ export const dynamic = "force-dynamic";
 export default async function BookPage() {
   const user = await pageUser(["CUSTOMER", "STAFF", "OWNER"]);
   const team = user.role !== "CUSTOMER";
+  const db = getDb();
   const [services, stylists] = await Promise.all([
-    prisma.service.findMany({ where: { active: true }, orderBy: [{ category: "asc" }, { priceCents: "asc" }] }),
-    prisma.stylist.findMany({ where: { active: true }, select: { id: true, name: true, title: true }, orderBy: { name: "asc" } }),
+    db.select().from(schema.services).where(eq(schema.services.active, true)).orderBy(asc(schema.services.category), asc(schema.services.priceCents)),
+    stylistOptions(db),
   ]);
   const today = salonNow().date;
 
   return (
     <div className="container section">
-      <h1>{team ? "Book for a client" : "Book an appointment"}</h1>
-      <p className="muted">
+      <div className="eyebrow">{team ? "Salon booking" : "Online booking"}</div>
+      <h1>{team ? "Book for a client" : "Book your appointment"}</h1>
+      <p className="lead">
         {team
           ? "Phone or walk-in booking. If the client has an account, use their email and it will appear in their account."
           : "Choose your services, where you'd like them, and a time that works for you."}
