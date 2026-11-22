@@ -47,7 +47,7 @@ export default function FeedbackBoard({ mode }: { mode: "owner" | "staff" }) {
   const shown = all.filter((f) => (filter === "public" ? f.isPublic : filter === "low" ? f.rating <= 3 : true));
 
   return (
-    <div className="container section">
+    <div className={owner ? "container" : "container section"} style={owner ? { paddingBottom: 48 } : undefined}>
       <div className="eyebrow">{owner ? "Owner" : "Staff"}</div>
       <h1>{owner ? "Client feedback" : "My reviews"}</h1>
       <p className="lead">{owner ? "Read every review, reply, and choose which ones appear on the home page." : "What clients said about their visits with you."}</p>

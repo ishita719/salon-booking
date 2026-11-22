@@ -113,7 +113,14 @@ export default function StaffSchedule({ name, today, worksToday }: Props) {
                   <div className="small muted">In studio</div>
                 )}
                 {a.notes && <div className="small" style={{ marginTop: 4, background: "var(--warn-soft)", padding: "4px 8px", borderRadius: 6 }}>Note: {a.notes}</div>}
-                <div className="small muted" style={{ marginTop: 4 }}>{a.totalLabel}</div>
+                <div className="row small" style={{ marginTop: 4, gap: 6 }}>
+                  <span className="muted">{a.totalLabel}</span>
+                  {a.offerTitle && <span className="tag tag-gold">{a.offerTitle}</span>}
+                  <span className={`tag ${a.paymentStatus.startsWith("PAID") ? "tag-ok" : ""}`}>{a.paymentLabel}</span>
+                  {(a.paymentStatus === "UNPAID" || a.paymentStatus === "PENDING") && a.status !== "CANCELLED" && (
+                    <button className="btn btn-sm btn-ghost" disabled={busyId === a.id} onClick={() => act(a, { action: "payment", paymentStatus: "PAID_IN_SALON" }, `Record payment of ${a.totalLabel} taken at the salon?`)}>💳 Take payment</button>
+                  )}
+                </div>
               </div>
               <div className="stack" style={{ alignItems: "flex-end", display: "flex", flexDirection: "column", gap: 6 }}>
                 <StatusBadge status={a.status} />

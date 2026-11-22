@@ -32,6 +32,8 @@ export const services = sqliteTable("services", {
   priceCents: integer("price_cents").notNull(),
   homeAvailable: integer("home_available", { mode: "boolean" }).notNull().default(true),
   active: integer("active", { mode: "boolean" }).notNull().default(true),
+  targets: text("targets").notNull().default(""), // comma list of skin/hair needs it helps (see lib/skin.ts)
+  steps: text("steps").notNull().default(""), // "how it's done", one step per line
   createdAt: createdAt(),
 });
 
@@ -85,6 +87,13 @@ export const appointments = sqliteTable(
     hasCustom: integer("has_custom", { mode: "boolean" }).notNull().default(false),
     rescheduleCount: integer("reschedule_count").notNull().default(0),
     cancelledAt: integer("cancelled_at", { mode: "timestamp_ms" }),
+    discountCents: integer("discount_cents").notNull().default(0),
+    offerId: text("offer_id"),
+    offerTitle: text("offer_title"),
+    paymentStatus: text("payment_status").notNull().default("UNPAID"), // UNPAID | PENDING | PAID_ONLINE | PAID_IN_SALON | REFUNDED
+    paidCents: integer("paid_cents").notNull().default(0),
+    stripeSessionId: text("stripe_session_id"),
+    paidAt: integer("paid_at", { mode: "timestamp_ms" }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -125,6 +134,73 @@ export const feedback = sqliteTable(
     createdAt: createdAt(),
   },
   (t) => [uniqueIndex("feedback_appointment_uq").on(t.appointmentId), index("feedback_stylist_idx").on(t.stylistId)],
+);
+
+// Retail products recommended after the skin check.
+export const products = sqliteTable("products", {
+  id: id(),
+  name: text("name").notNull(),
+  brand: text("brand").notNull().default(""),
+  category: text("category").notNull(),
+  description: text("description").notNull().default(""),
+  howToUse: text("how_to_use").notNull().default(""),
+  priceCents: integer("price_cents").notNull(),
+  targets: text("targets").notNull().default(""),
+  active: integer("active", { mode: "boolean" }).notNull().default(true),
+  createdAt: createdAt(),
+});
+
+// Discounts the owner runs. Applied automatically at booking (best single offer wins).
+export const offers = sqliteTable("offers", {
+  id: id(),
+  title: text("title").notNull(),
+  description: text("description").notNull().default(""),
+  discountType: text("discount_type").notNull().default("PERCENT"), // PERCENT | AMOUNT
+  value: integer("value").notNull(), // percent, or cents for AMOUNT
+  serviceIds: text("service_ids").notNull().default(""),
+  categories: text("categories").notNull().default(""),
+  firstVisitOnly: integer("first_visit_only", { mode: "boolean" }).notNull().default(false),
+  startsOn: text("starts_on"),
+  endsOn: text("ends_on"),
+  active: integer("active", { mode: "boolean" }).notNull().default(true),
+  createdAt: createdAt(),
+});
+
+// Result of the client's online skin & hair check.
+export const skinProfiles = sqliteTable("skin_profiles", {
+  userId: text("user_id").primaryKey().references(() => users.id, { onDelete: "cascade" }),
+  answers: text("answers").notNull(), // JSON
+  skinType: text("skin_type").notNull(),
+  sensitivity: text("sensitivity").notNull(),
+  concerns: text("concerns").notNull().default(""),
+  hairType: text("hair_type").notNull().default(""),
+  hairConcerns: text("hair_concerns").notNull().default(""),
+  updatedAt: updatedAt(),
+});
+
+// "Our work" photos.
+export const gallery = sqliteTable("gallery", {
+  id: id(),
+  title: text("title").notNull(),
+  category: text("category").notNull(),
+  description: text("description").notNull().default(""),
+  image: text("image"), // compressed JPEG data URL
+  stylistId: text("stylist_id").references(() => stylists.id, { onDelete: "set null" }),
+  sort: integer("sort").notNull().default(0),
+  createdAt: createdAt(),
+});
+
+// Anonymous page views for the owner's visitor stats (random visitor id, no personal data).
+export const pageViews = sqliteTable(
+  "page_views",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    date: text("date").notNull(),
+    path: text("path").notNull(),
+    visitor: text("visitor").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [index("page_views_date_idx").on(t.date)],
 );
 
 // Small key/value store for salon settings (e.g. the staff access code).

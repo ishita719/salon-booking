@@ -4,7 +4,10 @@ import { CategoryIcon, HeroArt } from "@/components/Icons";
 import Stars from "@/components/Stars";
 import { getDb, schema } from "@/db";
 import { BOOKING_RULES, HOME_VISITS, HOURS, SALON } from "@/lib/config";
+import GalleryGrid from "@/components/GalleryGrid";
+import { galleryItems } from "@/lib/content";
 import { publicReviews } from "@/lib/feedback";
+import { liveOffers } from "@/lib/offers";
 import { formatMoney, formatTime, salonNow, weekdayOf } from "@/lib/time";
 
 export const dynamic = "force-dynamic";
@@ -14,11 +17,13 @@ const initials = (name: string) => name.split(/\s+/).map((p) => p[0]).slice(0, 2
 
 export default async function Home() {
   const db = getDb();
-  const [services, team, reviews, ratings] = await Promise.all([
+  const [services, team, reviews, ratings, gallery, offerCount] = await Promise.all([
     db.select().from(schema.services).where(eq(schema.services.active, true)).orderBy(asc(schema.services.priceCents)),
     db.select().from(schema.stylists).where(eq(schema.stylists.active, true)).orderBy(asc(schema.stylists.name)),
     publicReviews(db, 6),
     db.select({ rating: schema.feedback.rating }).from(schema.feedback),
+    galleryItems(db, 6),
+    liveOffers(db).then((o) => o.length),
   ]);
 
   const categories = [...new Set(services.map((s) => s.category))].map((cat) => {
@@ -97,6 +102,39 @@ export default async function Home() {
         </div>
       </section>
 
+      {/* ---------- Online skin check ---------- */}
+      <section className="section">
+        <div className="container feature-band">
+          <div>
+            <div className="eyebrow">New · Free for members</div>
+            <h2>Not sure what your skin needs? Check it online first.</h2>
+            <p className="lead">Answer 9 quick questions about your skin and hair. We&apos;ll show your skin profile, the treatments that suit you, the products to use at home — and the offers that apply.</p>
+            <ul style={{ paddingLeft: 18, color: "var(--muted)" }}>
+              <li>Personal morning &amp; evening routine</li>
+              <li>Treatments matched to your skin type and concerns</li>
+              <li>Product picks with how to use them</li>
+              <li>Member prices on recommended services</li>
+            </ul>
+            <div className="row" style={{ marginTop: 16 }}>
+              <Link href="/account/skin-check" className="btn btn-lg">Start my skin check</Link>
+              <Link href="/register" className="btn btn-outline btn-lg">Create free account</Link>
+            </div>
+          </div>
+          <div className="mock-quiz" aria-hidden>
+            <div className="small muted">Question 1 of 9</div>
+            <div className="progress"><span style={{ width: "11%" }} /></div>
+            <h3>By midday, how does your skin feel?</h3>
+            <div className="opt-grid" style={{ gridTemplateColumns: "1fr 1fr" }}>
+              <div className="opt"><strong>Shiny all over</strong><span>I often blot</span></div>
+              <div className="opt on"><strong>Shiny T-zone</strong><span>Cheeks normal</span></div>
+              <div className="opt"><strong>Tight or flaky</strong><span>Needs moisture</span></div>
+              <div className="opt"><strong>Comfortable</strong><span>Balanced</span></div>
+            </div>
+            <div className="alert alert-gold small" style={{ marginTop: 14, marginBottom: 0 }}>✦ Result: Combination skin · Hydra-Glow Facial recommended</div>
+          </div>
+        </div>
+      </section>
+
       {/* ---------- At-home band ---------- */}
       <section className="section">
         <div className="container">
@@ -138,6 +176,38 @@ export default async function Home() {
           </div>
         </div>
       </section>
+
+      {/* ---------- Our work ---------- */}
+      <section className="section" style={{ paddingTop: 0 }}>
+        <div className="container">
+          <div className="spread" style={{ alignItems: "flex-end", marginBottom: 24 }}>
+            <div className="section-head" style={{ marginBottom: 0 }}>
+              <div className="eyebrow">Our work</div>
+              <h2>Results we&apos;re proud of</h2>
+            </div>
+            <Link href="/gallery" className="btn btn-ghost">See the gallery →</Link>
+          </div>
+          <GalleryGrid items={gallery} />
+        </div>
+      </section>
+
+      {/* ---------- Member offers teaser ---------- */}
+      {offerCount > 0 && (
+        <section className="section" style={{ paddingTop: 0 }}>
+          <div className="container">
+            <div className="offer-card alt spread" style={{ padding: "32px 36px" }}>
+              <div style={{ position: "relative", zIndex: 1 }}>
+                <div className="eyebrow" style={{ color: "#f3d9a8" }}>Members only</div>
+                <div className="big">{offerCount} offer{offerCount > 1 ? "s" : ""} waiting for you</div>
+                <p style={{ margin: "8px 0 0" }}>Log in to see your personal prices — including a welcome discount on your first visit.</p>
+              </div>
+              <div className="row" style={{ position: "relative", zIndex: 1 }}>
+                <Link href="/login?next=/account/offers" className="btn btn-gold btn-lg">See my offers</Link>
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* ---------- Reviews ---------- */}
       <section className="section" id="reviews" style={{ background: "var(--bg-tint)" }}>

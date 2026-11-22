@@ -164,6 +164,19 @@ export function canClientChange(a: { status: string; date: string; startMin: num
   return (ACTIVE_STATUSES as readonly string[]).includes(a.status) && minutesUntil(a.date, a.startMin) >= BOOKING_RULES.changeCutoffHours * 60;
 }
 
+export const PAYMENT_LABEL: Record<string, string> = {
+  UNPAID: "Pay at salon",
+  PENDING: "Awaiting online payment",
+  PAID_ONLINE: "Paid online",
+  PAID_IN_SALON: "Paid at salon",
+  REFUNDED: "Refunded",
+};
+
+/** What the client owes for priced items: services + travel − offer discount (custom services are quoted at the visit). */
+export function amountDue(a: { subtotalCents: number; travelFeeCents: number; discountCents: number }): number {
+  return Math.max(0, a.subtotalCents + a.travelFeeCents - a.discountCents);
+}
+
 export function serialize(a: FullAppointment) {
   return {
     id: a.id,
@@ -189,10 +202,16 @@ export function serialize(a: FullAppointment) {
       priceLabel: i.priceCents == null ? "Quote at visit" : formatMoney(i.priceCents),
       isCustom: i.isCustom,
     })),
-    totalCents: a.subtotalCents + a.travelFeeCents,
+    totalCents: amountDue(a),
     subtotalLabel: formatMoney(a.subtotalCents),
     travelFeeLabel: a.travelFeeCents ? formatMoney(a.travelFeeCents) : null,
-    totalLabel: formatMoney(a.subtotalCents + a.travelFeeCents) + (a.hasCustom ? " + quote" : ""),
+    discountLabel: a.discountCents ? `−${formatMoney(a.discountCents)}` : null,
+    offerTitle: a.offerTitle,
+    totalLabel: formatMoney(amountDue(a)) + (a.hasCustom ? " + quote" : ""),
+    paymentStatus: a.paymentStatus,
+    paymentLabel: PAYMENT_LABEL[a.paymentStatus] ?? a.paymentStatus,
+    paidLabel: a.paidCents ? formatMoney(a.paidCents) : null,
+    canPayOnline: a.paymentStatus !== "PAID_ONLINE" && a.paymentStatus !== "PAID_IN_SALON" && a.paymentStatus !== "REFUNDED" && amountDue(a) > 0 && (ACTIVE_STATUSES as readonly string[]).includes(a.status),
     rescheduleCount: a.rescheduleCount,
     isActive: (ACTIVE_STATUSES as readonly string[]).includes(a.status),
     isPast: minutesUntil(a.date, a.endMin) < 0,
@@ -210,7 +229,9 @@ export function summaryText(a: AppointmentDTO): string {
     `Where: ${a.locationType === "HOME" ? `At home — ${a.address}, ${a.postalCode}` : "In the salon"}`,
     `Stylist: ${a.stylist?.name ?? "To be assigned"}`,
     `Services: ${a.items.map((i) => i.name).join(", ")}`,
+    ...(a.offerTitle ? [`Offer applied: ${a.offerTitle} (${a.discountLabel})`] : []),
     `Estimated total: ${a.totalLabel}`,
+    `Payment: ${a.paymentLabel}`,
   ].join("\n");
 }
 

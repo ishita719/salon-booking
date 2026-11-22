@@ -19,10 +19,11 @@ interface Props {
   a: AppointmentDTO;
   onCancel?: () => void;
   onDelete?: () => void;
+  onPay?: () => void;
   busy?: boolean;
 }
 
-export default function AppointmentCard({ a, onCancel, onDelete, busy }: Props) {
+export default function AppointmentCard({ a, onCancel, onDelete, onPay, busy }: Props) {
   const removable = a.status === "CANCELLED" || a.isPast;
   return (
     <div className="card">
@@ -43,12 +44,17 @@ export default function AppointmentCard({ a, onCancel, onDelete, busy }: Props) 
       <div className="small muted">
         {a.locationType === "HOME" ? `At home · ${a.address}, ${a.postalCode}` : "In studio"} · Stylist: {a.stylist?.name ?? "TBA"}
       </div>
-      <div className="small" style={{ marginTop: 4 }}>
-        Estimated total: <strong>{a.totalLabel}</strong>
-        {a.travelFeeLabel && <span className="muted"> (incl. {a.travelFeeLabel} travel)</span>}
+      {a.offerTitle && <div className="tag tag-gold" style={{ marginTop: 6 }}>{a.discountLabel} · {a.offerTitle}</div>}
+      <div className="spread small" style={{ marginTop: 6 }}>
+        <span>
+          Total: <strong>{a.totalLabel}</strong>
+          {a.travelFeeLabel && <span className="muted"> (incl. {a.travelFeeLabel} travel)</span>}
+        </span>
+        <span className={`tag ${a.paymentStatus === "PAID_ONLINE" || a.paymentStatus === "PAID_IN_SALON" ? "tag-ok" : ""}`}>{a.paymentLabel}</span>
       </div>
       {a.notes && <div className="small muted" style={{ marginTop: 4 }}>Notes: {a.notes}</div>}
       <div className="row" style={{ marginTop: 14 }}>
+        {onPay && <button className="btn btn-sm btn-gold" disabled={busy} onClick={onPay}>💳 Pay now</button>}
         {a.canChange && <Link className="btn btn-sm" href={`/account/appointments/${a.id}`}>Reschedule</Link>}
         {a.canCancel && onCancel && <button className="btn btn-sm btn-danger" disabled={busy} onClick={onCancel}>Cancel</button>}
         {!a.isPast && a.status !== "CANCELLED" && (

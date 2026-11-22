@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
+import TargetPicker from "@/components/TargetPicker";
 import { api } from "@/lib/client";
 import { formatDuration, formatMoney } from "@/lib/time";
 
@@ -13,9 +14,11 @@ interface Service {
   priceCents: number;
   homeAvailable: boolean;
   active: boolean;
+  targets: string; // comma list — what it's good for (skin check)
+  steps: string; // how it's done, one step per line
 }
 
-const EMPTY: Omit<Service, "id"> = { name: "", category: "Hair", description: "", durationMin: 60, priceCents: 5000, homeAvailable: true, active: true };
+const EMPTY: Omit<Service, "id"> = { name: "", category: "Hair", description: "", durationMin: 60, priceCents: 5000, homeAvailable: true, active: true, targets: "", steps: "" };
 
 export default function ServicesManager() {
   const [list, setList] = useState<Service[]>([]);
@@ -37,7 +40,7 @@ export default function ServicesManager() {
     setError(null);
     const { id, ...body } = editing;
     try {
-      await api(id ? `/api/services/${id}` : "/api/services", { method: id ? "PATCH" : "POST", body });
+      await api(id ? `/api/services/${id}` : "/api/services", { method: id ? "PATCH" : "POST", body: { ...body, targets: body.targets.split(",").filter(Boolean) } });
       setEditing(null);
       await load();
     } catch (err) {
@@ -58,7 +61,7 @@ export default function ServicesManager() {
   const set = <K extends keyof Service>(k: K, v: Service[K]) => setEditing((cur) => (cur ? { ...cur, [k]: v } : cur));
 
   return (
-    <div className="container section">
+    <div className="container" style={{ paddingBottom: 48 }}>
       <div className="spread">
         <div>
           <h1>Services &amp; prices</h1>
@@ -78,6 +81,14 @@ export default function ServicesManager() {
             <div className="field"><label htmlFor="s-price">Price (CAD)</label><input id="s-price" type="number" min={0} step={0.01} required value={editing.priceCents / 100} onChange={(e) => set("priceCents", Math.round(Number(e.target.value) * 100))} /></div>
           </div>
           <div className="field"><label htmlFor="s-desc">Description</label><textarea id="s-desc" maxLength={300} value={editing.description} onChange={(e) => set("description", e.target.value)} /></div>
+          <div className="field">
+            <label>Good for (used by the online skin check to recommend this service)</label>
+            <TargetPicker value={editing.targets.split(",").filter(Boolean)} onChange={(t) => set("targets", t.join(","))} />
+          </div>
+          <div className="field">
+            <label htmlFor="s-steps">How it&apos;s done — one step per line (shown to clients)</label>
+            <textarea id="s-steps" maxLength={2000} rows={5} value={editing.steps} onChange={(e) => set("steps", e.target.value)} placeholder={"Consultation\nWash and condition\nCut\nStyle and finish"} />
+          </div>
           <div className="row" style={{ marginBottom: 16 }}>
             <label className="choice" style={{ padding: 10 }}><input type="checkbox" checked={editing.homeAvailable} onChange={(e) => set("homeAvailable", e.target.checked)} /> Available at home</label>
             <label className="choice" style={{ padding: 10 }}><input type="checkbox" checked={editing.active} onChange={(e) => set("active", e.target.checked)} /> Visible to clients</label>

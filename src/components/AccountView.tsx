@@ -9,7 +9,7 @@ import { api } from "@/lib/client";
 
 type User = { name: string; email: string; phone: string };
 
-export default function AccountView() {
+export default function AccountView({ payOnline = false }: { payOnline?: boolean }) {
   const [tab, setTab] = useState<"upcoming" | "past" | "profile">("upcoming");
   const [list, setList] = useState<AppointmentDTO[] | null>(null);
   const [user, setUser] = useState<User | null>(null);
@@ -29,9 +29,23 @@ export default function AccountView() {
     const params = new URLSearchParams(window.location.search);
     if (params.get("booked")) setFlash({ kind: "ok", text: "You're booked! A confirmation has been sent to your email." });
     if (params.get("rescheduled")) setFlash({ kind: "ok", text: "Your appointment has been rescheduled." });
-    if (params.size) window.history.replaceState(null, "", "/account");
+    if (params.get("paid")) setFlash({ kind: "ok", text: "Payment received — thank you! Your appointment is paid." });
+    if (params.get("payment") === "cancelled") setFlash({ kind: "error", text: "Payment was cancelled. Your booking is still saved — you can pay now or at the salon." });
+    if (params.get("payment") === "pending") setFlash({ kind: "error", text: "We couldn't confirm the payment yet. If you were charged, it will show here shortly." });
+    if (params.size) window.history.replaceState(null, "", "/account/appointments");
     load().catch((e) => setFlash({ kind: "error", text: e.message }));
   }, [load]);
+
+  async function pay(id: string) {
+    setBusyId(id);
+    try {
+      const r = await api<{ url: string }>("/api/payments/checkout", { method: "POST", body: { appointmentId: id } });
+      window.location.href = r.url; // Stripe's secure payment page
+    } catch (e) {
+      setFlash({ kind: "error", text: (e as Error).message });
+      setBusyId(null);
+    }
+  }
 
   async function act(id: string, kind: "cancel" | "delete") {
     const q = kind === "cancel" ? "Cancel this appointment?" : "Remove this appointment from your history? This can't be undone.";
@@ -84,7 +98,7 @@ export default function AccountView() {
       ) : (
         <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))" }}>
           {shown.map((a) => (
-            <AppointmentCard key={a.id} a={a} busy={busyId === a.id} onCancel={() => act(a.id, "cancel")} onDelete={() => act(a.id, "delete")} />
+            <AppointmentCard key={a.id} a={a} busy={busyId === a.id} onCancel={() => act(a.id, "cancel")} onPay={payOnline && a.canPayOnline ? () => pay(a.id) : undefined} onDelete={() => act(a.id, "delete")} />
           ))}
         </div>
       )}

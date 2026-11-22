@@ -1,11 +1,11 @@
 // Business numbers for the owner dashboard.
 
-import { and, asc, count, desc, eq, gte, inArray, lte } from "drizzle-orm";
+import { and, asc, count, countDistinct, desc, eq, gte, inArray, lte } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 import { hydrate, serialize } from "./bookings";
 import { addDays, formatMoney, salonNow } from "./time";
 
-const { appointments, appointmentItems, users, stylists, feedback } = schema;
+const { appointments, appointmentItems, users, stylists, feedback, pageViews } = schema;
 
 export async function getOwnerStats() {
   const db = getDb();
@@ -15,7 +15,7 @@ export async function getOwnerStats() {
   const monthEnd = `${month}-31`;
   const weekEnd = addDays(today, 6);
 
-  const [monthAppts, todayRows, upcoming, newClients, team, week, ratings, latestFeedback] = await Promise.all([
+  const [monthAppts, todayRows, upcoming, newClients, team, week, ratings, latestFeedback, visitorsToday] = await Promise.all([
     db.select().from(appointments).where(and(gte(appointments.date, monthStart), lte(appointments.date, monthEnd))),
     db.select().from(appointments).where(eq(appointments.date, today)).orderBy(asc(appointments.startMin)),
     db.select({ n: count() }).from(appointments).where(and(gte(appointments.date, today), inArray(appointments.status, ["BOOKED", "CONFIRMED"]))),
@@ -24,6 +24,7 @@ export async function getOwnerStats() {
     db.select({ n: count() }).from(appointments).where(and(gte(appointments.date, today), lte(appointments.date, weekEnd), inArray(appointments.status, ["BOOKED", "CONFIRMED", "COMPLETED"]))),
     db.select({ rating: feedback.rating }).from(feedback),
     db.select().from(feedback).orderBy(desc(feedback.createdAt)).limit(3),
+    db.select({ n: countDistinct(pageViews.visitor) }).from(pageViews).where(eq(pageViews.date, today)),
   ]);
 
   // Top services this month (by line items on non-cancelled bookings).
@@ -61,6 +62,7 @@ export async function getOwnerStats() {
     onlineShare: monthAppts.length ? `${Math.round((monthAppts.filter((a) => a.source === "ONLINE").length / monthAppts.length) * 100)}%` : "—",
     homeVisits: live.filter((a) => a.locationType === "HOME").length,
     avgRating: avg == null ? "—" : avg.toFixed(1),
+    visitorsToday: visitorsToday[0]?.n ?? 0,
     reviewCount: ratings.length,
     latestFeedback: latestFeedback.map((f) => ({
       id: f.id,

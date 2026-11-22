@@ -6,6 +6,16 @@ Code lives on GitHub; Cloudflare rebuilds and publishes the site on every push.
 
 ---
 
+## What's inside
+
+**Public website:** home page (hero, services, online skin-check, at-home visits, team, **our work gallery**, member-offers teaser, reviews, hours), services with a **"How it's done"** step-by-step page for each, gallery.
+
+**Clients (after login, `/login`):** *For you* home · **online skin & hair check** (9 questions → skin profile, AM/PM routine, recommended treatments & products) · **personal offers** applied automatically · booking with **online payment (Stripe)** or pay at salon · appointments (reschedule, cancel, pay now, calendar) · feedback & ratings.
+
+**Owner (`/team` → Owner):** dashboard · **Insights** (site visitors, bookings made, visit→booking rate, services booked & charges, payments online/at salon/outstanding, offers used, busiest days & times, repeat clients, skin-check trends, **CSV export**) · appointments (status, move, **mark paid / refunded**) · clients · team & **team secret code** · manage services (with *good for* tags + steps), **offers, products, gallery** (photo upload), feedback.
+
+**Staff (`/team` → Staff + team secret code):** own schedule, take payment at the salon, time off, book walk-ins, own reviews.
+
 ## Who uses it
 
 | | **Client** | **Staff** | **Owner** |
@@ -94,13 +104,15 @@ Click **Deploy**. Every push to `main` now rebuilds and publishes automatically,
 |---|---|
 | `AUTH_SECRET` | long random string (48+ characters) |
 | `SETUP_CODE` | private one-time code for creating the owner account |
+| `STRIPE_SECRET_KEY` | optional — Stripe secret key (start with `sk_test_…`) to accept online payments |
+| `STRIPE_WEBHOOK_SECRET` | optional — from Stripe → Webhooks (endpoint `https://<your-site>/api/payments/webhook`, event `checkout.session.completed`) |
 | `RESEND_API_KEY`, `EMAIL_FROM` | optional, for real confirmation emails via resend.com |
 
 Then **Deployments → Retry/Redeploy** so the secrets are picked up.
 
 ### 4. Create the owner, then the team
-1. Open `https://<your-site>.workers.dev/team/setup` → create the owner account with `SETUP_CODE` (works only once).
-2. **Owner → Team → Generate a code** → give it privately to staff.
+1. Open `https://<your-site>.workers.dev/team/setup` → create the owner account with `SETUP_CODE` (works only once) and **choose the team secret code** there.
+2. Give the team secret code privately to staff (you can change it any time on **Owner → Team**).
 3. Staff create their accounts at `/team/join`.
 4. Optional: add your own domain under **salon-booking → Settings → Domains & Routes**.
 

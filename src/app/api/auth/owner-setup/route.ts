@@ -6,6 +6,7 @@ import { startSession } from "@/lib/auth";
 import { getEnv } from "@/lib/env";
 import { codesMatch, hashPassword } from "@/lib/password";
 import { rateLimit } from "@/lib/rate-limit";
+import { setStaffCode } from "@/lib/settings";
 import { ownerSetupSchema } from "@/lib/validation";
 
 async function ownerExists() {
@@ -17,7 +18,7 @@ export const GET = route(async () => {
   return NextResponse.json({ needed: !(await ownerExists()) });
 });
 
-// One-time owner account creation. Works ONLY while there is no owner yet, and only with SETUP_CODE
+// One-time owner account creation (owner also sets the team secret code). Works ONLY while there is no owner yet, and only with SETUP_CODE
 // (a secret you set in Cloudflare). After that, this endpoint is permanently closed.
 export const POST = route(async (req) => {
   rateLimit(`owner-setup:${clientIp(req)}`, 5, 60 * 60 * 1000);
@@ -35,6 +36,7 @@ export const POST = route(async (req) => {
     .insert(schema.users)
     .values({ name: data.name, email: data.email, phone: data.phone, passwordHash: await hashPassword(data.password), role: "OWNER" })
     .returning({ id: schema.users.id, role: schema.users.role });
+  await setStaffCode(data.teamCode); // the owner sets the team secret code while creating the account
   await startSession(user);
   return NextResponse.json({ ok: true, home: "/owner" }, { status: 201 });
 });

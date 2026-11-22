@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter, Playfair_Display } from "next/font/google";
 import Link from "next/link";
 import NavLinks, { NavItem } from "@/components/NavLinks";
+import VisitTracker from "@/components/VisitTracker";
 import { getSessionUser, SessionUser } from "@/lib/auth";
 import { HOME_VISITS, SALON } from "@/lib/config";
 import { ROLE_LABEL } from "@/lib/roles";
@@ -20,19 +21,20 @@ function navFor(user: SessionUser | null): NavItem[] {
   if (!user)
     return [
       { href: "/services", label: "Services", hideSm: true },
-      { href: "/#team", label: "Our team", hideSm: true },
+      { href: "/gallery", label: "Our work", hideSm: true },
       { href: "/#reviews", label: "Reviews", hideSm: true },
+      { href: "/account/skin-check", label: "Skin check", hideSm: true },
       { href: "/login", label: "Client login" },
       { href: "/book", label: "Book now", cta: true },
     ];
   if (user.role === "OWNER")
     return [
       { href: "/owner", label: "Dashboard" },
+      { href: "/owner/insights", label: "Insights" },
       { href: "/owner/appointments", label: "Appointments" },
-      { href: "/owner/team", label: "Team" },
       { href: "/owner/clients", label: "Clients" },
-      { href: "/owner/feedback", label: "Feedback" },
-      { href: "/owner/services", label: "Services" },
+      { href: "/owner/team", label: "Team" },
+      { href: "/owner/services", label: "Manage" },
       { href: "/settings", label: "Settings" },
       { href: "/book", label: "New booking", cta: true },
     ];
@@ -45,9 +47,12 @@ function navFor(user: SessionUser | null): NavItem[] {
       { href: "/book", label: "Book a client", cta: true },
     ];
   return [
-    { href: "/services", label: "Services", hideSm: true },
-    { href: "/account", label: "My appointments" },
-    { href: "/account/feedback", label: "Feedback" },
+    { href: "/account", label: "For you" },
+    { href: "/account/skin-check", label: "Skin check" },
+    { href: "/account/appointments", label: "Appointments" },
+    { href: "/account/offers", label: "Offers" },
+    { href: "/account/products", label: "Products", hideSm: true },
+    { href: "/account/feedback", label: "Feedback", hideSm: true },
     { href: "/book", label: "Book now", cta: true },
   ];
 }
@@ -58,6 +63,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   return (
     <html lang="en-CA" className={`${sans.variable} ${serif.variable}`}>
       <body>
+        <VisitTracker />
         <header className="header">
           <div className="container">
             <div className="row" style={{ gap: 10 }}>
@@ -96,6 +102,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                 <h4>Clients &amp; team</h4>
                 <ul>
                   <li><Link href="/book">Book an appointment</Link></li>
+                  <li><Link href="/account/skin-check">Online skin check</Link></li>
+                  <li><Link href="/gallery">Our work</Link></li>
                   <li><Link href="/login">Client login</Link></li>
                   <li><Link href="/team">Salon team login</Link></li>
                 </ul>

@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import SlotPicker from "@/components/SlotPicker";
 import { api } from "@/lib/client";
+import { bestOffer, OfferLike, offerLabel } from "@/lib/offer-math";
 import { formatDate, formatDuration, formatMoney, formatTime } from "@/lib/time";
 
 interface Service {
@@ -24,12 +25,18 @@ interface Props {
   teamMode?: boolean; // staff/owner booking on behalf of a client
   defaultStylistId?: string;
   doneHref: string;
+  recommendedIds?: string[]; // from the client's skin check
+  offers?: OfferLike[]; // live offers this client can use
+  firstVisit?: boolean;
+  payOnlineAvailable?: boolean;
+  initialServiceId?: string;
 }
 
-export default function BookingForm({ services, stylists, minDate, maxDate, rules, teamMode, defaultStylistId = "", doneHref }: Props) {
+export default function BookingForm({ services, stylists, minDate, maxDate, rules, teamMode, defaultStylistId = "", doneHref, recommendedIds = [], offers = [], firstVisit = false, payOnlineAvailable = false, initialServiceId }: Props) {
   const router = useRouter();
   const [client, setClient] = useState({ name: "", phone: "", email: "" });
-  const [selected, setSelected] = useState<string[]>([]);
+  const [selected, setSelected] = useState<string[]>(initialServiceId && services.some((s) => s.id === initialServiceId) ? [initialServiceId] : []);
+  const [payOnline, setPayOnline] = useState(false);
   const [custom, setCustom] = useState<string[]>([]);
   const [customInput, setCustomInput] = useState("");
   const [location, setLocation] = useState<"SALON" | "HOME">("SALON");
@@ -44,15 +51,21 @@ export default function BookingForm({ services, stylists, minDate, maxDate, rule
 
   const byCategory = useMemo(() => {
     const m: Record<string, Service[]> = {};
-    for (const s of services) (m[s.category] ??= []).push(s);
+    const rec = services.filter((s) => recommendedIds.includes(s.id));
+    if (rec.length) m["✦ Recommended for you"] = rec;
+    for (const s of services) if (!recommendedIds.includes(s.id)) (m[s.category] ??= []).push(s);
     return m;
-  }, [services]);
+  }, [services, recommendedIds]);
 
   const chosen = services.filter((s) => selected.includes(s.id));
   const count = chosen.length + custom.length;
   const duration = chosen.reduce((t, s) => t + s.durationMin, 0) + custom.length * rules.customDurationMin;
   const subtotal = chosen.reduce((t, s) => t + s.priceCents, 0);
   const travel = location === "HOME" ? rules.travelFeeCents : 0;
+  const offer = teamMode ? null : bestOffer(offers, chosen, firstVisit);
+  const discount = offer?.discountCents ?? 0;
+  const total = subtotal + travel - discount;
+  const singleOffer = (s: Service) => (teamMode ? null : bestOffer(offers, [s], firstVisit));
 
   function toggle(id: string) {
     setSelected((cur) => (cur.includes(id) ? cur.filter((x) => x !== id) : count < rules.maxServices ? [...cur, id] : cur));
@@ -77,7 +90,7 @@ export default function BookingForm({ services, stylists, minDate, maxDate, rule
     if (!date || startMin == null) return setError("Choose a date and time.");
     setBusy(true);
     try {
-      await api("/api/appointments", {
+      const res = await api("/api/appointments", {
         method: "POST",
         body: {
           serviceIds: selected,
@@ -90,9 +103,15 @@ export default function BookingForm({ services, stylists, minDate, maxDate, rule
           startMin,
           notes: notes || undefined,
           client: teamMode ? client : undefined,
+          payOnline: !teamMode && payOnline,
         },
       });
-      router.push(doneHref);
+      const r = res as { checkoutUrl?: string | null; paymentNote?: string | null };
+      if (r.checkoutUrl) {
+        window.location.href = r.checkoutUrl; // Stripe's secure payment page
+        return;
+      }
+      router.push(r.paymentNote ? `${doneHref}&payment=pending` : doneHref);
       router.refresh();
     } catch (e) {
       setError((e as Error).message);
@@ -132,9 +151,15 @@ export default function BookingForm({ services, stylists, minDate, maxDate, rule
                       <input type="checkbox" checked={on} disabled={disabled} onChange={() => toggle(s.id)} />
                       <span>
                         <span className="title">{s.name}</span>
+                        {recommendedIds.includes(s.id) && cat !== "✦ Recommended for you" && <span className="tag tag-gold" style={{ marginLeft: 6 }}>For you</span>}
                         <br />
                         <span className="small muted">
-                          {formatDuration(s.durationMin)} · {formatMoney(s.priceCents)}
+                          {formatDuration(s.durationMin)} ·{" "}
+                          {singleOffer(s) ? (
+                            <><span className="price-was">{formatMoney(s.priceCents)}</span><span className="price-now">{formatMoney(s.priceCents - singleOffer(s)!.discountCents)}</span></>
+                          ) : (
+                            formatMoney(s.priceCents)
+                          )}
                           {disabled && " · salon only"}
                         </span>
                       </span>
@@ -251,15 +276,37 @@ export default function BookingForm({ services, stylists, minDate, maxDate, rule
         <div className="small muted">Where: {location === "HOME" ? "At home" : "In studio"}</div>
         <div className="small muted">When: {date && startMin != null ? `${formatDate(date)}, ${formatTime(startMin)}` : "—"}</div>
         <hr style={{ border: 0, borderTop: "1px solid var(--line)", margin: "14px 0" }} />
+        {subtotal > 0 && <div className="spread small"><span>Services</span><span>{formatMoney(subtotal)}</span></div>}
         {travel > 0 && <div className="spread small"><span>Travel fee</span><span>{formatMoney(travel)}</span></div>}
-        <div className="spread"><strong>Estimated total</strong><strong>{formatMoney(subtotal + travel)}{custom.length ? " + quote" : ""}</strong></div>
+        {offer && (
+          <div className="spread small" style={{ color: "var(--ok)" }}>
+            <span>✦ {offer.offer.title} ({offerLabel(offer.offer)})</span>
+            <span>−{formatMoney(discount)}</span>
+          </div>
+        )}
+        <div className="spread" style={{ marginTop: 6 }}><strong>Total</strong><strong style={{ fontSize: "1.2rem" }}>{formatMoney(total)}{custom.length ? " + quote" : ""}</strong></div>
+        {!teamMode && payOnlineAvailable && total > 0 && (
+          <div style={{ marginTop: 14 }}>
+            <div className="small" style={{ fontWeight: 600, marginBottom: 6 }}>How would you like to pay?</div>
+            <div className="pay-choice">
+              <label className={`choice ${payOnline ? "selected" : ""}`} style={{ padding: 10 }}>
+                <input type="radio" name="pay" checked={payOnline} onChange={() => setPayOnline(true)} />
+                <span><span className="title small">💳 Pay online now</span><br /><span className="small muted">Card, Apple Pay, Google Pay</span></span>
+              </label>
+              <label className={`choice ${!payOnline ? "selected" : ""}`} style={{ padding: 10 }}>
+                <input type="radio" name="pay" checked={!payOnline} onChange={() => setPayOnline(false)} />
+                <span><span className="title small">At the salon</span><br /><span className="small muted">Pay after your visit</span></span>
+              </label>
+            </div>
+          </div>
+        )}
         {teamMode && client.name && <div className="small muted">For: {client.name}</div>}
         <p className="small muted" style={{ marginTop: 8 }}>
-          {teamMode ? "Paid at the visit." : `Pay at your visit. Free changes up to ${rules.cutoffHours} h before.`}
+          {teamMode ? "Paid at the visit." : payOnline ? "You'll be taken to Stripe's secure page to pay. Your card details never touch our site." : `Pay at your visit. Free changes up to ${rules.cutoffHours} h before.`}
         </p>
         {error && <div className="alert alert-error" role="alert">{error}</div>}
         <button className="btn" style={{ width: "100%" }} onClick={submit} disabled={busy || !count || startMin == null}>
-          {busy ? "Booking…" : "Confirm booking"}
+          {busy ? "Booking…" : payOnline ? `Book & pay ${formatMoney(total)}` : "Confirm booking"}
         </button>
       </aside>
     </div>

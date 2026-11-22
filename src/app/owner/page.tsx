@@ -17,6 +17,7 @@ export default async function OwnerDashboard() {
   const cards = [
     { label: "Revenue this month", value: s.revenueMonth, hint: "completed visits" },
     { label: "Booked revenue ahead", value: s.expectedMonth, hint: "rest of this month" },
+    { label: "Visitors today", value: s.visitorsToday, hint: "people on the website" },
     { label: "Today", value: s.todayCount, hint: "appointments" },
     { label: "Next 7 days", value: s.weekCount, hint: "appointments" },
     { label: "Upcoming", value: s.upcomingCount, hint: "all future bookings" },
@@ -34,6 +35,7 @@ export default async function OwnerDashboard() {
           <p className="muted">{formatDate(s.today)} — here&apos;s how the salon is doing.</p>
         </div>
         <div className="row">
+          <Link href="/owner/insights" className="btn btn-ghost">📊 Insights</Link>
           <Link href="/owner/appointments" className="btn btn-ghost">All appointments</Link>
           <Link href="/book" className="btn">New booking</Link>
         </div>

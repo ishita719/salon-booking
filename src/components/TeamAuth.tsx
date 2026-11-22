@@ -16,7 +16,7 @@ function safeNext(): string | null {
 const SIDE: Record<Mode, { title: string; text: string }> = {
   login: { title: "Salon team", text: "One login for the owner and staff. Staff also enter the staff code from the owner every time they sign in." },
   join: { title: "Join the team", text: "Create your staff account with the staff code the owner gave you. You'll land straight on your schedule." },
-  setup: { title: "First-time setup", text: "Create the owner account. This only works once, with the setup code you saved in Cloudflare." },
+  setup: { title: "First-time setup", text: "Create the owner account and set the team secret code your staff will use. This only works once." },
 };
 
 /** TEAM login (owner or staff + code), staff sign-up (needs code) and one-time owner setup. */
@@ -121,10 +121,18 @@ export default function TeamAuth({ mode }: { mode: Mode }) {
               </div>
             )}
             {mode === "setup" && (
-              <div className="field">
-                <label htmlFor="setupCode">Setup code</label>
-                <input id="setupCode" name="setupCode" type="password" required autoComplete="off" maxLength={64} />
-              </div>
+              <>
+                <div className="field">
+                  <label htmlFor="teamCode">Set your team secret code</label>
+                  <input id="teamCode" name="teamCode" type="text" className="code-input" required minLength={6} maxLength={32} pattern="[A-Za-z0-9\-]+" autoComplete="off" spellCheck={false} placeholder="e.g. MAPLE-TEAM-2026" />
+                  <div className="hint">Your staff will need this code to create their account and every time they log in. You can change it later on Owner → Team.</div>
+                </div>
+                <div className="field">
+                  <label htmlFor="setupCode">Setup code</label>
+                  <input id="setupCode" name="setupCode" type="password" required autoComplete="off" maxLength={64} />
+                  <div className="hint">The one-time SETUP_CODE saved in the website&apos;s settings — proves you&apos;re the owner.</div>
+                </div>
+              </>
             )}
             <button className="btn btn-block btn-lg" disabled={busy}>
               {busy ? "Please wait…" : mode === "join" ? "Create staff account" : mode === "setup" ? "Create owner account" : `Log in as ${as === "OWNER" ? "owner" : "staff"}`}

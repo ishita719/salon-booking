@@ -293,3 +293,66 @@ tbody tr:hover { background: #fdf9f6; }
 .weekdays input { accent-color: var(--brand); }
 .code-box { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; padding: 18px 20px; border-radius: var(--radius-sm); background: var(--gold-soft); border: 1px dashed var(--gold); }
 .code-box .code { font-family: ui-monospace, "Cascadia Code", Consolas, monospace; font-size: 1.5rem; font-weight: 700; letter-spacing: 0.12em; color: #2a1724; }
+
+/* ---------- v3: skin check, offers, gallery, insights ---------- */
+.tag { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 999px; font-size: 0.76rem; font-weight: 600; background: var(--rose-soft); color: var(--brand); }
+.tag-gold { background: var(--gold-soft); color: #7a5520; }
+.tag-ok { background: var(--ok-soft); color: var(--ok); }
+.tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.price-was { text-decoration: line-through; color: var(--muted); font-weight: 400; margin-right: 6px; }
+.price-now { color: var(--brand); font-weight: 700; }
+.offer-card { position: relative; overflow: hidden; border-radius: var(--radius); padding: 24px; color: #fff; background: var(--grad); box-shadow: var(--shadow); }
+.offer-card::after { content: ""; position: absolute; right: -40px; top: -40px; width: 150px; height: 150px; border-radius: 50%; background: rgba(255, 255, 255, 0.1); }
+.offer-card .big { font-family: var(--font-display); font-size: 2rem; font-weight: 700; line-height: 1.1; }
+.offer-card p, .offer-card .small { color: rgba(255, 255, 255, 0.86); }
+.offer-card.alt { background: linear-gradient(135deg, #2a1724, #5c2a4a); }
+.offer-card.gold { background: linear-gradient(135deg, #a67c3d, #d9b67a); color: #2a1724; }
+.offer-card.gold p, .offer-card.gold .small { color: rgba(42, 23, 36, 0.8); }
+
+.quiz { max-width: 760px; margin: 0 auto; }
+.progress { height: 8px; background: var(--surface-2); border-radius: 999px; overflow: hidden; margin: 10px 0 26px; }
+.progress > span { display: block; height: 100%; background: var(--grad); border-radius: 999px; transition: width 0.3s ease; }
+.opt-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
+.opt { text-align: left; border: 1.5px solid var(--line); background: var(--surface); border-radius: 16px; padding: 16px 18px; font: inherit; cursor: pointer; transition: all 0.15s; }
+.opt:hover { border-color: var(--rose); transform: translateY(-1px); }
+.opt.on { border-color: var(--brand-2); background: var(--brand-soft); box-shadow: 0 0 0 3px rgba(138, 74, 110, 0.12); }
+.opt strong { display: block; }
+.opt span { color: var(--muted); font-size: 0.86rem; }
+.result-hero { border-radius: 24px; padding: 32px; background: linear-gradient(135deg, #fbeef0, #f7efe2); border: 1px solid var(--line); }
+.routine { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); }
+.routine ol { padding-left: 20px; margin: 8px 0 0; }
+.routine li { margin-bottom: 6px; }
+
+.gallery-grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
+.g-tile { position: relative; border-radius: var(--radius); overflow: hidden; aspect-ratio: 4 / 5; background: var(--grad); box-shadow: var(--shadow); }
+.g-tile img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform 0.5s ease; }
+.g-tile:hover img { transform: scale(1.05); }
+.g-tile .g-art { position: absolute; inset: 0; display: grid; place-items: center; color: rgba(255, 255, 255, 0.85); }
+.g-tile .g-art svg { width: 38%; height: 38%; }
+.g-tile:nth-child(3n + 2) { background: linear-gradient(135deg, #2a1724, #8a4a6e); }
+.g-tile:nth-child(3n + 3) { background: linear-gradient(135deg, #c39a5b, #e8b4bc); }
+.g-cap { position: absolute; left: 0; right: 0; bottom: 0; padding: 40px 16px 14px; color: #fff; background: linear-gradient(transparent, rgba(20, 10, 16, 0.78)); }
+.g-cap strong { display: block; font-family: var(--font-display); font-size: 1.1rem; }
+.g-cap span { font-size: 0.82rem; opacity: 0.85; }
+
+.timeline { list-style: none; padding: 0; margin: 0; counter-reset: tl; }
+.timeline li { position: relative; padding: 0 0 22px 56px; counter-increment: tl; }
+.timeline li::before { content: counter(tl); position: absolute; left: 0; top: -2px; width: 38px; height: 38px; border-radius: 50%; background: var(--grad); color: #fff; display: grid; place-items: center; font-weight: 700; }
+.timeline li::after { content: ""; position: absolute; left: 18px; top: 40px; bottom: 2px; width: 2px; background: var(--line); }
+.timeline li:last-child::after { display: none; }
+
+.bars { display: flex; align-items: flex-end; gap: 3px; height: 140px; padding-top: 10px; }
+.bars .bar { flex: 1; min-width: 3px; background: var(--grad); border-radius: 4px 4px 0 0; position: relative; }
+.bars .bar.alt { background: var(--grad-gold); }
+.bars .bar:hover::after { content: attr(data-tip); position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%); background: #2a1724; color: #fff; font-size: 0.72rem; padding: 3px 7px; border-radius: 6px; white-space: nowrap; margin-bottom: 4px; z-index: 2; }
+.hbar { display: grid; grid-template-columns: 140px 1fr 48px; gap: 10px; align-items: center; font-size: 0.88rem; margin-bottom: 8px; }
+.hbar .track { height: 10px; background: var(--surface-2); border-radius: 999px; overflow: hidden; }
+.hbar .track span { display: block; height: 100%; background: var(--grad); border-radius: 999px; }
+.subnav { display: flex; gap: 6px; flex-wrap: wrap; margin: 4px 0 22px; }
+.subnav a { padding: 7px 14px; border-radius: 999px; text-decoration: none; color: var(--text); background: var(--surface); border: 1px solid var(--line); font-size: 0.9rem; }
+.subnav a.active { background: var(--brand); color: #fff; border-color: var(--brand); }
+.pay-choice { display: grid; gap: 10px; grid-template-columns: 1fr 1fr; }
+@media (max-width: 560px) { .pay-choice { grid-template-columns: 1fr; } .hbar { grid-template-columns: 100px 1fr 40px; } }
+.feature-band { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; align-items: center; }
+@media (max-width: 860px) { .feature-band { grid-template-columns: 1fr; } }
+.mock-quiz { background: var(--surface); border-radius: 22px; padding: 22px; box-shadow: var(--shadow-lg); border: 1px solid var(--line); }

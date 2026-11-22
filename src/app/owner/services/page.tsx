@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import ManageTabs from "@/components/ManageTabs";
 import ServicesManager from "@/components/ServicesManager";
 import { pageUser } from "@/lib/auth";
 
@@ -7,5 +8,10 @@ export const dynamic = "force-dynamic";
 
 export default async function OwnerServicesPage() {
   await pageUser(["OWNER"]);
-  return <ServicesManager />;
+  return (
+    <>
+      <ManageTabs />
+      <ServicesManager />
+    </>
+  );
 }

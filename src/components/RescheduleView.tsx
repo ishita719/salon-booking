@@ -17,7 +17,7 @@ interface Props {
   asTeam?: boolean; // staff/owner: no 12-hour cutoff
 }
 
-export default function RescheduleView({ id, stylists, minDate, maxDate, backHref = "/account", asTeam: asAdmin = false }: Props) {
+export default function RescheduleView({ id, stylists, minDate, maxDate, backHref = "/account/appointments", asTeam: asAdmin = false }: Props) {
   const router = useRouter();
   const [a, setA] = useState<AppointmentDTO | null>(null);
   const [stylistId, setStylistId] = useState("");
@@ -41,7 +41,7 @@ export default function RescheduleView({ id, stylists, minDate, maxDate, backHre
     setError(null);
     try {
       await api(`/api/appointments/${id}`, { method: "PATCH", body: { action: "reschedule", date, startMin, stylistId: stylistId || null } });
-      router.push(backHref === "/account" ? "/account?rescheduled=1" : backHref);
+      router.push(backHref === "/account/appointments" ? "/account/appointments?rescheduled=1" : backHref);
       router.refresh();
     } catch (e) {
       setError((e as Error).message);

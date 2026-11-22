@@ -5,12 +5,16 @@ import { BOOKING_RULES, HOME_VISITS } from "@/lib/config";
 import { asc, eq } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 import { stylistOptions } from "@/lib/bookings";
+import { liveOffers } from "@/lib/offers";
+import { getRecommendations } from "@/lib/recommend";
+import { stripeEnabled } from "@/lib/stripe";
 import { addDays, salonNow } from "@/lib/time";
 
 export const metadata: Metadata = { title: "Book an appointment" };
 export const dynamic = "force-dynamic";
 
-export default async function BookPage() {
+export default async function BookPage({ searchParams }: { searchParams: Promise<{ service?: string }> }) {
+  const { service: initialServiceId } = await searchParams;
   const user = await pageUser(["CUSTOMER", "STAFF", "OWNER"]);
   const team = user.role !== "CUSTOMER";
   const db = getDb();
@@ -19,6 +23,9 @@ export default async function BookPage() {
     stylistOptions(db),
   ]);
   const today = salonNow().date;
+  // Clients: personal recommendations (from the skin check) and live offers.
+  const recs = team ? null : await getRecommendations(db, user.id);
+  const offers = team ? [] : (await liveOffers(db)).map((o) => ({ id: o.id, title: o.title, discountType: o.discountType, value: o.value, serviceIds: o.serviceIds, categories: o.categories, firstVisitOnly: o.firstVisitOnly, startsOn: o.startsOn, endsOn: o.endsOn, active: o.active }));
 
   return (
     <div className="container section">
@@ -42,8 +49,13 @@ export default async function BookPage() {
         minDate={today}
         maxDate={addDays(today, BOOKING_RULES.maxDaysAhead)}
         teamMode={team}
+        recommendedIds={recs?.services.map((s) => s.id) ?? []}
+        offers={offers}
+        firstVisit={recs?.firstVisit ?? false}
+        payOnlineAvailable={!team && stripeEnabled()}
+        initialServiceId={initialServiceId}
         defaultStylistId={user.role === "STAFF" ? (user.stylistId ?? "") : ""}
-        doneHref={user.role === "OWNER" ? "/owner/appointments" : user.role === "STAFF" ? "/staff" : "/account?booked=1"}
+        doneHref={user.role === "OWNER" ? "/owner/appointments" : user.role === "STAFF" ? "/staff" : "/account/appointments?booked=1"}
         rules={{
           customDurationMin: BOOKING_RULES.customServiceDurationMin,
           maxServices: BOOKING_RULES.maxServicesPerBooking,

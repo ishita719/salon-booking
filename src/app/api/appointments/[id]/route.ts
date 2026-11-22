@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { getDb, schema } from "@/db";
 import { ApiError, isTeam, requireUser, route } from "@/lib/api";
 import type { SessionUser } from "@/lib/auth";
-import { canAccess, canClientChange, FullAppointment, loadAppointment, lostRace, pickStylistForSlot, serialize, summaryText } from "@/lib/bookings";
+import { amountDue, canAccess, canClientChange, FullAppointment, loadAppointment, lostRace, pickStylistForSlot, serialize, summaryText } from "@/lib/bookings";
 import { ACTIVE_STATUSES, BOOKING_RULES, SALON } from "@/lib/config";
 import { sendEmail } from "@/lib/email";
 import { appointmentPatchSchema } from "@/lib/validation";
@@ -42,6 +42,20 @@ export const PATCH = route<Ctx>(async (req, { params }) => {
     await db
       .update(appointments)
       .set({ status: body.status, cancelledAt: body.status === "CANCELLED" ? new Date() : null })
+      .where(eq(appointments.id, id));
+    return NextResponse.json({ appointment: await reload() });
+  }
+
+  if (body.action === "payment") {
+    if (!team) throw new ApiError(403, "Only the salon can record payments.");
+    if (body.paymentStatus === "REFUNDED" && user.role !== "OWNER") throw new ApiError(403, "Only the owner can mark a refund.");
+    if (appt.paymentStatus === "PAID_ONLINE" && body.paymentStatus !== "REFUNDED") {
+      throw new ApiError(400, "This booking was paid online. Refund it in Stripe first, then mark it as refunded.");
+    }
+    const paid = body.paymentStatus === "PAID_IN_SALON" ? (body.paidCents ?? amountDue(appt)) : body.paymentStatus === "REFUNDED" ? appt.paidCents : 0;
+    await db
+      .update(appointments)
+      .set({ paymentStatus: body.paymentStatus, paidCents: paid, paidAt: body.paymentStatus === "PAID_IN_SALON" ? new Date() : appt.paidAt })
       .where(eq(appointments.id, id));
     return NextResponse.json({ appointment: await reload() });
   }

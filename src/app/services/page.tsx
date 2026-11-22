@@ -49,7 +49,7 @@ export default async function ServicesPage() {
                       <span className="chip">⏱ {formatDuration(s.durationMin)}</span>
                       <span className="chip">{s.homeAvailable ? "⌂ Studio or home" : "Studio only"}</span>
                     </div>
-                    <Link href="/book" className="btn btn-sm btn-outline">Book</Link>
+                    <Link href={`/services/${s.id}`} className="btn btn-sm btn-outline">How it's done →</Link>
                   </div>
                 </div>
               ))}

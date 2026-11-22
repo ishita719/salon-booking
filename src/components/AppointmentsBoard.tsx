@@ -55,6 +55,17 @@ export default function AppointmentsBoard({ today, stylists }: Props) {
     }
   }
 
+  async function recordPayment(a: AppointmentDTO, paymentStatus: "PAID_IN_SALON" | "UNPAID" | "REFUNDED") {
+    const msg = paymentStatus === "REFUNDED" ? "Mark this payment as refunded? (Refund the money in Stripe or at the till first.)" : null;
+    if (msg && !window.confirm(msg)) return;
+    try {
+      await api(`/api/appointments/${a.id}`, { method: "PATCH", body: { action: "payment", paymentStatus } });
+      await load();
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }
+
   async function remove(id: string) {
     if (!window.confirm("Permanently delete this appointment? This can't be undone. (Tip: use Cancelled to keep a record.)")) return;
     try {
@@ -139,6 +150,18 @@ export default function AppointmentsBoard({ today, stylists }: Props) {
                       <div key={i.id}>{i.name}{i.isCustom && <span className="badge badge-NO_SHOW" style={{ marginLeft: 6 }}>custom</span>}</div>
                     ))}
                     <div className="small muted">{a.totalLabel}</div>
+                    {a.offerTitle && <div className="small" style={{ color: "var(--gold)" }}>{a.discountLabel} · {a.offerTitle}</div>}
+                    <div style={{ marginTop: 4 }}>
+                      <span className={`tag ${a.paymentStatus.startsWith("PAID") ? "tag-ok" : ""}`}>{a.paymentLabel}{a.paidLabel ? ` · ${a.paidLabel}` : ""}</span>
+                    </div>
+                    <div className="row" style={{ gap: 4, marginTop: 4 }}>
+                      {(a.paymentStatus === "UNPAID" || a.paymentStatus === "PENDING") && a.status !== "CANCELLED" && (
+                        <button className="btn btn-sm btn-ghost" onClick={() => recordPayment(a, "PAID_IN_SALON")}>Mark paid</button>
+                      )}
+                      {(a.paymentStatus === "PAID_ONLINE" || a.paymentStatus === "PAID_IN_SALON") && (
+                        <button className="btn btn-sm btn-ghost" onClick={() => recordPayment(a, "REFUNDED")}>Refunded</button>
+                      )}
+                    </div>
                     {a.notes && <div className="small muted">“{a.notes}”</div>}
                   </td>
                   <td>

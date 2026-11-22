@@ -72,6 +72,13 @@ export const ownerSetupSchema = z.object({
   phone: phoneSchema,
   password: passwordSchema,
   setupCode: codeField("Setup code"),
+  // The owner chooses the team secret code here; staff need it to join and at every login.
+  teamCode: z
+    .string({ required_error: "Choose a team secret code" })
+    .trim()
+    .min(6, "Team secret code: use at least 6 characters")
+    .max(32, "Team secret code: use at most 32 characters")
+    .regex(/^[A-Za-z0-9-]+$/, "Team secret code: use letters, numbers and dashes only"),
 });
 
 // Owner sets the staff code (or asks for a random one).
@@ -130,6 +137,7 @@ export const bookingSchema = z
     address: z.string().trim().max(200).optional(),
     postalCode: z.string().optional(),
     notes: z.string().trim().max(500, "Notes must be under 500 characters").optional(),
+    payOnline: z.boolean().optional(), // client chose "Pay online now" (Stripe)
     // Only used when staff/owner book on behalf of a client (walk-in or phone booking).
     client: z
       .object({
@@ -171,7 +179,60 @@ export const statusSchema = z.object({
   status: z.enum(ALL_STATUSES),
 });
 
-export const appointmentPatchSchema = z.discriminatedUnion("action", [rescheduleSchema, cancelSchema, statusSchema]);
+// Salon records a payment taken at the counter (cash / card machine), or the owner marks a refund.
+export const paymentSchema = z.object({
+  action: z.literal("payment"),
+  paymentStatus: z.enum(["PAID_IN_SALON", "UNPAID", "REFUNDED"]),
+  paidCents: z.number().int().min(0).max(10_000_000).optional(),
+});
+
+export const appointmentPatchSchema = z.discriminatedUnion("action", [rescheduleSchema, cancelSchema, statusSchema, paymentSchema]);
+
+const targetList = z.array(z.string().max(30)).max(30).transform((a) => [...new Set(a)].join(","));
+
+export const productSchema = z.object({
+  name: z.string().trim().min(2, "Name is too short").max(80),
+  brand: z.string().trim().max(60).default(""),
+  category: z.string().trim().min(2).max(40),
+  description: z.string().trim().max(400).default(""),
+  howToUse: z.string().trim().max(400).default(""),
+  priceCents: z.number().int().min(0).max(1_000_000),
+  targets: targetList.default([]),
+  active: z.boolean().default(true),
+});
+
+export const offerSchema = z
+  .object({
+    title: z.string().trim().min(3, "Title is too short").max(80),
+    description: z.string().trim().max(300).default(""),
+    discountType: z.enum(["PERCENT", "AMOUNT"]),
+    value: z.number().int().min(1),
+    serviceIds: z.array(z.string().max(64)).max(60).transform((a) => a.join(",")).default([]),
+    categories: z.array(z.string().max(40)).max(20).transform((a) => a.join(",")).default([]),
+    firstVisitOnly: z.boolean().default(false),
+    startsOn: dateSchema.nullable().optional(),
+    endsOn: dateSchema.nullable().optional(),
+    active: z.boolean().default(true),
+  })
+  .superRefine((v, ctx) => {
+    if (v.discountType === "PERCENT" && v.value > 90) ctx.addIssue({ code: "custom", message: "Percent discount can be at most 90%" });
+    if (v.startsOn && v.endsOn && v.endsOn < v.startsOn) ctx.addIssue({ code: "custom", message: "End date must be after the start date" });
+  });
+
+export const galleryItemSchema = z.object({
+  title: z.string().trim().min(2).max(80),
+  category: z.string().trim().min(2).max(40),
+  description: z.string().trim().max(300).default(""),
+  stylistId: z.string().max(64).nullable().optional(),
+  // Compressed in the browser before upload; ~700 KB max as text.
+  image: z
+    .string()
+    .max(950_000, "Image is too large — please use a smaller photo")
+    .regex(/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/, "Please upload a JPG, PNG or WebP image")
+    .nullable()
+    .optional(),
+  sort: z.number().int().min(0).max(10_000).optional(),
+});
 
 export const passwordChangeSchema = z.object({
   currentPassword: z.string().min(1, "Enter your current password").max(100),
@@ -229,4 +290,6 @@ export const serviceSchema = z.object({
   priceCents: z.number().int().min(0).max(1_000_000),
   homeAvailable: z.boolean().default(true),
   active: z.boolean().default(true),
+  targets: targetList.default([]),
+  steps: z.string().trim().max(2000).default(""), // "how it's done", one step per line
 });

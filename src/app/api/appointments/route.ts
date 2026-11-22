@@ -3,14 +3,16 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getDb, schema } from "@/db";
 import { ApiError, clientIp, isTeam, requireUser, route } from "@/lib/api";
-import { buildItems, hydrate, loadAppointment, lostRace, pickStylistForSlot, serialize, summaryText } from "@/lib/bookings";
+import { amountDue, buildItems, hydrate, loadAppointment, lostRace, pickStylistForSlot, serialize, summaryText } from "@/lib/bookings";
+import { bestOffer, isFirstVisit, liveOffers } from "@/lib/offers";
+import { createCheckoutSession, stripeEnabled } from "@/lib/stripe";
 import { ACTIVE_STATUSES, ALL_STATUSES, SALON } from "@/lib/config";
 import { sendEmail } from "@/lib/email";
 import { rateLimit } from "@/lib/rate-limit";
 import { addDays, salonNow } from "@/lib/time";
 import { bookingSchema, dateSchema } from "@/lib/validation";
 
-const { appointments, appointmentItems, users } = schema;
+const { appointments, appointmentItems, users, services } = schema;
 
 const listQuery = z.object({
   date: dateSchema.optional(),
@@ -87,6 +89,10 @@ export const POST = route(async (req) => {
   }
 
   const priced = await buildItems(db, data.serviceIds, data.customServices, data.locationType);
+
+  // Best live offer for the chosen services (offers don't stack).
+  const svcRows = data.serviceIds.length ? await db.select().from(services).where(inArray(services.id, data.serviceIds)) : [];
+  const offer = bestOffer(await liveOffers(db), svcRows, await isFirstVisit(db, forWho.userId));
   const stylistId = await pickStylistForSlot(db, {
     date: data.date,
     startMin: data.startMin,
@@ -118,6 +124,9 @@ export const POST = route(async (req) => {
       subtotalCents: priced.subtotalCents,
       travelFeeCents: priced.travelFeeCents,
       hasCustom: priced.hasCustom,
+      discountCents: offer?.discountCents ?? 0,
+      offerId: offer?.offer.id ?? null,
+      offerTitle: offer?.offer.title ?? null,
       createdAt: now,
       updatedAt: now,
     }),
@@ -130,6 +139,30 @@ export const POST = route(async (req) => {
     throw new ApiError(409, "Sorry, someone just booked that time. Please pick another.");
   }
 
+  // "Pay online now": send the client to Stripe's secure checkout. If that fails, the booking stays (pay at salon).
+  let checkoutUrl: string | null = null;
+  let paymentNote: string | null = null;
+  if (data.payOnline && !team) {
+    const due = amountDue({ subtotalCents: priced.subtotalCents, travelFeeCents: priced.travelFeeCents, discountCents: offer?.discountCents ?? 0 });
+    if (!stripeEnabled()) paymentNote = "Online payment isn't available right now — you can pay at the salon.";
+    else if (due > 0) {
+      try {
+        const session = await createCheckoutSession({
+          appointmentId: id,
+          amountCents: due,
+          description: `${data.date} · ${priced.items.map((i) => i.name).join(", ")}`,
+          email: forWho.email,
+          origin: new URL(req.url).origin,
+        });
+        await db.update(appointments).set({ paymentStatus: "PENDING", stripeSessionId: session.id }).where(eq(appointments.id, id));
+        checkoutUrl = session.url;
+      } catch (e) {
+        console.error("Stripe checkout failed", e);
+        paymentNote = "We couldn't start online payment — your booking is saved and you can pay at the salon or try again from My appointments.";
+      }
+    }
+  }
+
   const dto = serialize((await loadAppointment(db, id))!);
   if (forWho.email) {
     await sendEmail(
@@ -138,5 +171,5 @@ export const POST = route(async (req) => {
       `Hi ${forWho.name},\n\nThanks for booking with ${SALON.name}!\n\n${summaryText(dto)}\n\nNeed to change it? Call us at ${SALON.phone}${forWho.userId ? " or manage it from your account" : ""}.`,
     );
   }
-  return NextResponse.json({ appointment: dto }, { status: 201 });
+  return NextResponse.json({ appointment: dto, checkoutUrl, paymentNote }, { status: 201 });
 });

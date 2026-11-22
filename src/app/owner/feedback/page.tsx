@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import ManageTabs from "@/components/ManageTabs";
 import FeedbackBoard from "@/components/FeedbackBoard";
 import { pageUser } from "@/lib/auth";
 
@@ -7,5 +8,10 @@ export const dynamic = "force-dynamic";
 
 export default async function OwnerFeedbackPage() {
   await pageUser(["OWNER"]);
-  return <FeedbackBoard mode="owner" />;
+  return (
+    <>
+      <ManageTabs />
+      <FeedbackBoard mode="owner" />
+    </>
+  );
 }
