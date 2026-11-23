@@ -18,14 +18,15 @@ Code lives on GitHub; Cloudflare rebuilds and publishes the site on every push.
 
 ## Easy sign-in
 
-- **Clients — no account form:** the owner prints the salon QR (**Owner → Manage → QR codes**). Clients scan it, type **name + phone** (email optional) and they're in — signed in on that phone for 6 months, no password.
-  - Same phone number again? For safety it never logs in by number alone: clients with an email get a **6-digit email code**; others ask the front desk, where staff/owner tap **📱 Login QR** (one-time, 10 minutes).
-  - Clients can also log in with **"Email me a code"**, set an optional password, or show a login QR to sign in on another device (Settings).
+- **Clients — QR only (no passwords, no sign-up forms, no email codes):**
+  - **New client:** scan the salon QR (print it from **Owner → Manage → QR codes**) → type name + phone (email optional, only for confirmations) → signed in on that phone for 6 months.
+  - **On a computer:** the Client login page (`/login`) shows the QR — scan it with your phone. Already on your phone? "Continue on this phone".
+  - **Returning client on a new phone:** a number that already has an account never logs in by itself (anyone could type someone's number). They scan a one-time **login QR** (10 minutes, works once) — shown by the front desk (Owner → Clients, or staff on the appointment: **📱 Login QR**) or from their other phone (**Settings → Show my login QR**).
 - **Owner:** email + password + **owner code** (4–8 digits). Temporary code until changed: **0092** (the dashboard reminds you to change it in Settings).
   - **Forgot owner code?** → email → 6-digit code → set a new code (and optionally a new password).
   - **New owner account** (`/team/setup`): email verified by a 6-digit code + password + owner code. The first owner also sets the staff team code; later owners must first be **invited by an existing owner** (Owner → Team → Co-owners).
 - **Staff:** email + password + the team secret code (unchanged).
-- Email codes need `RESEND_API_KEY` in production. In local development without it, the code is shown on screen in a yellow "Test mode" box.
+- Owner email codes need `RESEND_API_KEY` in production. In local development without it, the code is shown on screen in a yellow "Test mode" box.
 
 ## Who uses it
 

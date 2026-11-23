@@ -39,7 +39,7 @@ export async function ownerCodeMatches(user: { pinHash: string | null }, code: s
 
 // ---------- Emailed 6-digit codes ----------
 
-export type CodePurpose = "OWNER_SIGNUP" | "OWNER_RESET" | "CLIENT_LOGIN";
+export type CodePurpose = "OWNER_SIGNUP" | "OWNER_RESET";
 const CODE_TTL_MS = 10 * 60 * 1000;
 const MAX_ATTEMPTS = 5;
 
@@ -51,7 +51,7 @@ export async function sendVerificationCode(db: DB, email: string, purpose: CodeP
   const code = String(n).padStart(6, "0");
   const id = crypto.randomUUID();
   await db.insert(schema.verificationCodes).values({ id, email, purpose, codeHash: await hashCode(id, code), expiresAt: new Date(Date.now() + CODE_TTL_MS) });
-  const what = purpose === "CLIENT_LOGIN" ? "log in" : purpose === "OWNER_RESET" ? "reset your owner code" : "create your owner account";
+  const what = purpose === "OWNER_RESET" ? "reset your owner code" : "create your owner account";
   await sendEmail(email, `${code} is your ${SALON.name} code`, `Your verification code to ${what} is:\n\n    ${code}\n\nIt expires in 10 minutes. If you didn't ask for this, you can ignore this email.`);
   const devMode = process.env.NODE_ENV !== "production" && !getEnv("RESEND_API_KEY");
   return devMode ? { devCode: code } : {};

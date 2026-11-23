@@ -80,7 +80,7 @@ export default function SettingsView({ embedded }: { embedded?: boolean }) {
               <div className="field">
                 <label htmlFor="p-email">Email</label>
                 <input id="p-email" name="email" type="email" maxLength={120} defaultValue={user.email ?? ""} placeholder="Add your email" />
-                <div className="hint">{user.email ? "Used for booking confirmations and login codes." : "Add an email to get confirmations and log in on other phones with a code."}</div>
+                <div className="hint">Only used for booking confirmations (optional).</div>
               </div>
             ) : (
               <div className="field"><label htmlFor="p-email">Email (login)</label><input id="p-email" type="email" value={user.email ?? ""} disabled /></div>
@@ -90,6 +90,7 @@ export default function SettingsView({ embedded }: { embedded?: boolean }) {
             <button className="btn">Save profile</button>
           </form>
 
+          {!client && (
           <form className="card" onSubmit={changePassword}>
             <h3>{user.hasPassword ? "Change password" : "Set a password (optional)"}</h3>
             {!user.hasPassword && <p className="small muted">You signed up with the salon QR — no password needed. Add one only if you&apos;d like to log in with email + password.</p>}
@@ -102,6 +103,7 @@ export default function SettingsView({ embedded }: { embedded?: boolean }) {
             <div className="field"><label htmlFor="pw-conf">Repeat new password</label><input id="pw-conf" name="confirm" type="password" required autoComplete="new-password" /></div>
             <button className="btn">{user.hasPassword ? "Change password" : "Set password"}</button>
           </form>
+          )}
 
           {user.role === "OWNER" && (
             <form className="card" onSubmit={changeOwnerCode}>
@@ -120,7 +122,7 @@ export default function SettingsView({ embedded }: { embedded?: boolean }) {
           {client && (
             <section className="card">
               <h3>Log in on another device</h3>
-              <p className="small muted">Show a one-time QR here and scan it with your other phone or tablet — you&apos;ll be signed in there too. It works once, for 10 minutes.</p>
+              <p className="small muted">Clients sign in with QR codes only. To use a new phone or tablet, show your one-time login QR here and scan it with the new device — it works once, for 10 minutes.</p>
               <LoginQrButton label="Show my login QR" className="btn" />
             </section>
           )}

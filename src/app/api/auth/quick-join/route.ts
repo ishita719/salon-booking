@@ -3,13 +3,14 @@ import { NextResponse } from "next/server";
 import { getDb, schema } from "@/db";
 import { ApiError, clientIp, route } from "@/lib/api";
 import { startSession } from "@/lib/auth";
-import { maskEmail, NO_PASSWORD, phoneDigits, placeholderEmail, realEmail, sendVerificationCode } from "@/lib/identity";
+import { NO_PASSWORD, phoneDigits, placeholderEmail } from "@/lib/identity";
 import { rateLimit } from "@/lib/rate-limit";
 import { quickJoinSchema } from "@/lib/validation";
 
-// Scan the salon QR → name + phone → you're in (no password).
-// If that phone number already has an account we never just log in (anyone could type someone's number):
-// we email a code instead, or the front desk shows a one-time login QR.
+// Clients sign in ONLY with QR codes:
+//  • New client: scan the salon QR → name + phone → signed in on this phone (no password).
+//  • Returning client on a new phone: typing a number that already has an account never logs anyone in
+//    (anyone could type someone's number) — they scan a one-time login QR from the front desk or their other phone.
 export const POST = route(async (req) => {
   const ip = clientIp(req);
   rateLimit(`quick-join:${ip}`, 12, 60 * 60 * 1000);
@@ -22,18 +23,15 @@ export const POST = route(async (req) => {
   const existing = await db.query.users.findFirst({ where: and(eq(u.phoneDigits, digits), eq(u.role, "CUSTOMER")) });
   if (existing) {
     if (!existing.active) throw new ApiError(403, "This account has been deactivated. Please contact the salon.");
-    const email = realEmail(existing.email);
-    if (!email) {
-      throw new ApiError(409, "Welcome back! This number already has an account. Please ask at the front desk — they'll show you a one-time QR to log in.");
-    }
-    rateLimit(`quick-join-code:${email}`, 5, 60 * 60 * 1000);
-    const { devCode } = await sendVerificationCode(db, email, "CLIENT_LOGIN");
-    return NextResponse.json({ needsCode: true, email, maskedEmail: maskEmail(email), devCode });
+    throw new ApiError(
+      409,
+      "Welcome back! This number already has an account. To log in on this phone, scan your login QR: ask at the front desk, or open Settings → “Show my login QR” on your other phone.",
+    );
   }
 
   const email = data.email || null;
   if (email && (await db.query.users.findFirst({ where: eq(u.email, email), columns: { id: true } }))) {
-    throw new ApiError(409, "That email already has an account. Use “Email me a code” on the login page, or leave email empty.");
+    throw new ApiError(409, "That email is already used by another account — leave it empty or use a different one.");
   }
   const [user] = await db
     .insert(u)

@@ -24,6 +24,10 @@ const csp = [
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   poweredByHeader: false,
+  // Clients sign in with the salon QR code only — the old sign-up page now points to the QR login page.
+  async redirects() {
+    return [{ source: "/register", destination: "/login", permanent: false }];
+  },
   async headers() {
     return [
       {

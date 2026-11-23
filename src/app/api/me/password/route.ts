@@ -9,6 +9,7 @@ import { passwordChangeSchema } from "@/lib/validation";
 
 export const PATCH = route(async (req) => {
   const me = await requireUser();
+  if (me.role === "CUSTOMER") throw new ApiError(400, "Clients sign in with QR codes — no password needed.");
   rateLimit(`pw:${me.id}`, 10, 15 * 60 * 1000);
   const db = getDb();
   const user = await db.query.users.findFirst({ where: eq(schema.users.id, me.id) });

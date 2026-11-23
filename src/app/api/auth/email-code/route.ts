@@ -7,8 +7,8 @@ import { rateLimit } from "@/lib/rate-limit";
 import { getOwnerInvites } from "@/lib/settings";
 import { emailCodeRequestSchema } from "@/lib/validation";
 
-// Sends a 6-digit code by email. For login/reset we always answer the same way, so nobody can use this
-// to find out which emails have accounts.
+// Sends a 6-digit code by email — OWNERS only (clients sign in with QR codes). For "forgot owner code" we always
+// answer the same way, so nobody can use this to find out which emails have accounts.
 export const POST = route(async (req) => {
   const { email, purpose } = emailCodeRequestSchema.parse(await req.json());
   rateLimit(`email-code:${clientIp(req)}`, 10, 60 * 60 * 1000);
@@ -17,9 +17,8 @@ export const POST = route(async (req) => {
   const u = schema.users;
   const generic = NextResponse.json({ ok: true, message: "If an account exists for that email, we've sent a 6-digit code. It expires in 10 minutes." });
 
-  if (purpose === "CLIENT_LOGIN" || purpose === "OWNER_RESET") {
-    const role = purpose === "CLIENT_LOGIN" ? "CUSTOMER" : "OWNER";
-    const user = await db.query.users.findFirst({ where: and(eq(u.email, email), eq(u.role, role), eq(u.active, true)) });
+  if (purpose === "OWNER_RESET") {
+    const user = await db.query.users.findFirst({ where: and(eq(u.email, email), eq(u.role, "OWNER"), eq(u.active, true)) });
     if (!user) return generic;
     const { devCode } = await sendVerificationCode(db, email, purpose);
     return devCode ? NextResponse.json({ ok: true, message: "Code sent.", devCode }) : generic;

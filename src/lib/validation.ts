@@ -28,20 +28,6 @@ export const passwordSchema = z
   .regex(/[A-Za-z]/, "Password needs at least one letter")
   .regex(/[0-9]/, "Password needs at least one number");
 
-// Client sign-up (/register). Always creates a CLIENT account.
-export const registerSchema = z.object({
-  name: trimmed(2, 80, "Name"),
-  email: emailSchema,
-  phone: phoneSchema,
-  password: passwordSchema,
-});
-
-// Client login (/login).
-export const loginSchema = z.object({
-  email: emailSchema,
-  password: z.string().min(1, "Password is required").max(100),
-});
-
 const codeField = (label: string) => z.string({ required_error: `${label} is required` }).trim().min(4, `Enter the ${label.toLowerCase()}`).max(64);
 
 // Team login (/team): owner = email + password; staff = email + password + staff code.
@@ -80,7 +66,7 @@ export const quickJoinSchema = z.object({
 
 export const emailCodeRequestSchema = z.object({
   email: emailSchema,
-  purpose: z.enum(["CLIENT_LOGIN", "OWNER_RESET", "OWNER_SIGNUP"]),
+  purpose: z.enum(["OWNER_RESET", "OWNER_SIGNUP"]), // email codes are for owners only (clients use QR)
 });
 
 export const emailLoginSchema = z.object({ email: emailSchema, code: sixDigits });
