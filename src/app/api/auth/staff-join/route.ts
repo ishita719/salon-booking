@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { getDb, schema } from "@/db";
 import { ApiError, clientIp, route } from "@/lib/api";
 import { startSession } from "@/lib/auth";
+import { phoneDigits } from "@/lib/identity";
 import { codesMatch, hashPassword } from "@/lib/password";
 import { rateLimit } from "@/lib/rate-limit";
 import { getStaffCode } from "@/lib/settings";
@@ -23,7 +24,7 @@ export const POST = route(async (req) => {
 
   const [user] = await db
     .insert(schema.users)
-    .values({ name: data.name, email: data.email, phone: data.phone, passwordHash: await hashPassword(data.password), role: "STAFF" })
+    .values({ name: data.name, email: data.email, phone: data.phone, phoneDigits: phoneDigits(data.phone), passwordHash: await hashPassword(data.password), role: "STAFF" })
     .returning({ id: schema.users.id, role: schema.users.role });
   // Bookable profile; the owner can change title and working days on the Team page.
   await db.insert(schema.stylists).values({ name: data.name, title: "Stylist", workDays: "2,3,4,5,6", userId: user.id });

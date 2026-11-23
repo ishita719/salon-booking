@@ -117,7 +117,7 @@ export default async function Home() {
             </ul>
             <div className="row" style={{ marginTop: 16 }}>
               <Link href="/account/skin-check" className="btn btn-lg">Start my skin check</Link>
-              <Link href="/register" className="btn btn-outline btn-lg">Create free account</Link>
+              <Link href="/welcome" className="btn btn-outline btn-lg">Join with name &amp; phone</Link>
             </div>
           </div>
           <div className="mock-quiz" aria-hidden>
@@ -262,7 +262,7 @@ export default async function Home() {
             </div>
             <div className="row">
               <Link href="/book" className="btn">Book now</Link>
-              <Link href="/register" className="btn btn-outline">Create account</Link>
+              <Link href="/welcome" className="btn btn-outline">Join in 30 seconds</Link>
             </div>
           </div>
         </div>

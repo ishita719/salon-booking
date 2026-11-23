@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
 import { api } from "@/lib/client";
 
-type Mode = "login" | "join" | "setup";
+type Mode = "login" | "join";
 
 function safeNext(): string | null {
   if (typeof window === "undefined") return null;
@@ -16,10 +16,9 @@ function safeNext(): string | null {
 const SIDE: Record<Mode, { title: string; text: string }> = {
   login: { title: "Salon team", text: "One login for the owner and staff. Staff also enter the staff code from the owner every time they sign in." },
   join: { title: "Join the team", text: "Create your staff account with the staff code the owner gave you. You'll land straight on your schedule." },
-  setup: { title: "First-time setup", text: "Create the owner account and set the team secret code your staff will use. This only works once." },
 };
 
-/** TEAM login (owner or staff + code), staff sign-up (needs code) and one-time owner setup. */
+/** TEAM login (owner + owner code, or staff + team code) and staff sign-up (needs the team code). */
 export default function TeamAuth({ mode }: { mode: Mode }) {
   const router = useRouter();
   const [as, setAs] = useState<"OWNER" | "STAFF">("STAFF");
@@ -52,7 +51,7 @@ export default function TeamAuth({ mode }: { mode: Mode }) {
     setError(null);
     setBusy(true);
     const f = Object.fromEntries(new FormData(e.currentTarget));
-    const url = mode === "login" ? "/api/auth/team-login" : mode === "join" ? "/api/auth/staff-join" : "/api/auth/owner-setup";
+    const url = mode === "login" ? "/api/auth/team-login" : "/api/auth/staff-join";
     try {
       const res = await api<{ home: string }>(url, { method: "POST", body: mode === "login" ? { ...f, as } : f });
       router.push(safeNext() ?? res.home);
@@ -64,7 +63,7 @@ export default function TeamAuth({ mode }: { mode: Mode }) {
   }
 
   const staffLogin = mode === "login" && as === "STAFF";
-  const title = mode === "join" ? "Create staff account" : mode === "setup" ? "Set up the owner account" : as === "OWNER" ? "Owner login" : "Staff login";
+  const title = mode === "join" ? "Create staff account" : as === "OWNER" ? "Owner login" : "Staff login";
 
   return (
     <div className="auth-wrap">
@@ -89,7 +88,6 @@ export default function TeamAuth({ mode }: { mode: Mode }) {
               <button type="button" role="tab" aria-selected={as === "STAFF"} className={as === "STAFF" ? "active" : ""} onClick={() => choose("STAFF")}>Staff</button>
             </div>
           )}
-          {mode === "setup" && <div className="alert alert-gold">Use the <strong>SETUP_CODE</strong> you added in Cloudflare. After the owner account exists, this page closes for good.</div>}
           {error && <div className="alert alert-error" role="alert">{error}</div>}
           <form onSubmit={onSubmit}>
             {mode !== "login" && (
@@ -120,22 +118,15 @@ export default function TeamAuth({ mode }: { mode: Mode }) {
                 <div className="hint">The code the owner shares with the team. Needed every time you log in.</div>
               </div>
             )}
-            {mode === "setup" && (
-              <>
-                <div className="field">
-                  <label htmlFor="teamCode">Set your team secret code</label>
-                  <input id="teamCode" name="teamCode" type="text" className="code-input" required minLength={6} maxLength={32} pattern="[A-Za-z0-9\-]+" autoComplete="off" spellCheck={false} placeholder="e.g. MAPLE-TEAM-2026" />
-                  <div className="hint">Your staff will need this code to create their account and every time they log in. You can change it later on Owner → Team.</div>
-                </div>
-                <div className="field">
-                  <label htmlFor="setupCode">Setup code</label>
-                  <input id="setupCode" name="setupCode" type="password" required autoComplete="off" maxLength={64} />
-                  <div className="hint">The one-time SETUP_CODE saved in the website&apos;s settings — proves you&apos;re the owner.</div>
-                </div>
-              </>
+            {mode === "login" && as === "OWNER" && (
+              <div className="field">
+                <label htmlFor="ownerCode">Owner code</label>
+                <input id="ownerCode" name="ownerCode" type="password" inputMode="numeric" className="code-input" required minLength={4} maxLength={8} autoComplete="off" placeholder="4–8 digits" />
+                <div className="hint">Your personal owner code (like a card PIN).</div>
+              </div>
             )}
             <button className="btn btn-block btn-lg" disabled={busy}>
-              {busy ? "Please wait…" : mode === "join" ? "Create staff account" : mode === "setup" ? "Create owner account" : `Log in as ${as === "OWNER" ? "owner" : "staff"}`}
+              {busy ? "Please wait…" : mode === "join" ? "Create staff account" : `Log in as ${as === "OWNER" ? "owner" : "staff"}`}
             </button>
           </form>
 
@@ -146,8 +137,13 @@ export default function TeamAuth({ mode }: { mode: Mode }) {
               <p className="small muted center" style={{ marginTop: 10 }}>You&apos;ll need the staff code from the owner. Forgot your password? Ask the owner to reset it.</p>
             </>
           )}
-          {mode === "login" && as === "OWNER" && setupNeeded && (
-            <div className="alert alert-gold" style={{ marginTop: 18 }}>No owner account yet. <Link href="/team/setup">Set it up now →</Link></div>
+          {mode === "login" && as === "OWNER" && (
+            <>
+              <p className="small center" style={{ marginTop: 12 }}><Link href="/team/recover">Forgot owner code or password?</Link></p>
+              <div className="or-divider"><span>New owner?</span></div>
+              <Link href="/team/setup" className="btn btn-outline btn-block">Create an owner account</Link>
+              {setupNeeded && <div className="alert alert-gold small" style={{ marginTop: 12 }}>No owner account exists yet — create the first one.</div>}
+            </>
           )}
           {mode !== "login" && <p className="small muted center" style={{ marginTop: 16 }}>Already have an account? <Link href="/team">Team login</Link></p>}
           <p className="small muted center" style={{ marginTop: 26 }}>Are you a client? <Link href="/login">Client login →</Link></p>

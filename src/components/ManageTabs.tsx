@@ -9,6 +9,7 @@ const TABS = [
   { href: "/owner/products", label: "Products" },
   { href: "/owner/gallery", label: "Gallery" },
   { href: "/owner/feedback", label: "Feedback" },
+  { href: "/owner/qr", label: "QR codes" },
 ];
 
 /** Owner "Manage" section tabs. */

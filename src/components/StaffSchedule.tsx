@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { StatusBadge } from "@/components/AppointmentCard";
 import type { AppointmentDTO } from "@/lib/bookings";
+import LoginQrButton from "@/components/LoginQrButton";
 import { api } from "@/lib/client";
 import { addDays, formatDate } from "@/lib/time";
 
@@ -101,6 +102,7 @@ export default function StaffSchedule({ name, today, worksToday }: Props) {
               <div>
                 <div>
                   <strong>{a.customer.name}</strong>{" "}
+                  {a.customer.id && <LoginQrButton clientId={a.customer.id} clientName={a.customer.name} label="Login QR" className="btn btn-sm btn-ghost" />}{" "}
                   {a.customer.phone && <a className="small" href={`tel:${a.customer.phone}`}>{a.customer.phone}</a>}
                 </div>
                 <div>{a.items.map((i) => i.name).join(" + ")}</div>

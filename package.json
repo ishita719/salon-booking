@@ -21,6 +21,7 @@
     "drizzle-orm": "^0.45.4",
     "jose": "^5.9.6",
     "next": "^15.5.29",
+    "qrcode-generator": "^2.0.4",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "zod": "^3.25.0"

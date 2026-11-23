@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { getDb, schema } from "@/db";
 import { ApiError, requireOwner, route } from "@/lib/api";
+import { phoneDigits } from "@/lib/identity";
 import { hashPassword } from "@/lib/password";
 import { teamUpdateSchema } from "@/lib/validation";
 
@@ -26,7 +27,10 @@ export const PATCH = route<Ctx>(async (req, { params }) => {
   if (stylist.userId) {
     const userSet: Partial<typeof users.$inferInsert> = {};
     if (data.name !== undefined) userSet.name = data.name;
-    if (data.phone !== undefined) userSet.phone = data.phone;
+    if (data.phone !== undefined) {
+      userSet.phone = data.phone;
+      userSet.phoneDigits = phoneDigits(data.phone);
+    }
     if (data.active !== undefined) userSet.active = data.active;
     if (data.newPassword) userSet.passwordHash = await hashPassword(data.newPassword);
     if (Object.keys(userSet).length) await db.update(users).set(userSet).where(eq(users.id, stylist.userId));

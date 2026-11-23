@@ -193,7 +193,7 @@ export function serialize(a: FullAppointment) {
     notes: a.notes,
     stylist: a.stylist,
     customer: a.user
-      ? { id: a.user.id as string | null, name: a.user.name, email: a.user.email as string | null, phone: a.user.phone, registered: true }
+      ? { id: a.user.id as string | null, name: a.user.name, email: a.user.email.endsWith("@no-email.invalid") ? null : (a.user.email as string | null), phone: a.user.phone, registered: true }
       : { id: null, name: a.guestName ?? "Walk-in client", email: a.guestEmail, phone: a.guestPhone ?? "", registered: false },
     items: a.items.map((i) => ({
       id: i.id,

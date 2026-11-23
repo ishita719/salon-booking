@@ -64,7 +64,7 @@ export const GET = route(async (req) => {
 
   const byUser = new Map<string, Row>();
   for (const c of customers) {
-    byUser.set(c.id, emptyRow({ key: c.id, clientId: c.id, guestPhone: null, name: c.name, email: c.email, phone: c.phone, registered: true }));
+    byUser.set(c.id, emptyRow({ key: c.id, clientId: c.id, guestPhone: null, name: c.name, email: c.email.endsWith("@no-email.invalid") ? null : c.email, phone: c.phone, registered: true }));
   }
   for (const a of owned) if (a.userId && byUser.has(a.userId)) tally(byUser.get(a.userId)!, a, today);
 

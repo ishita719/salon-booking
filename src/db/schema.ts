@@ -19,6 +19,8 @@ export const users = sqliteTable("users", {
   passwordHash: text("password_hash").notNull(),
   role: text("role").notNull().default("CUSTOMER"), // CUSTOMER | STAFF | OWNER
   active: integer("active", { mode: "boolean" }).notNull().default(true),
+  pinHash: text("pin_hash"), // owner code (hashed); null = temporary code
+  phoneDigits: text("phone_digits").notNull().default(""), // phone as digits only, for QR sign-in matching
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 });
@@ -202,6 +204,31 @@ export const pageViews = sqliteTable(
   },
   (t) => [index("page_views_date_idx").on(t.date)],
 );
+
+// 6-digit codes sent by email (owner sign-up / forgot code, client login). Stored hashed, 10-minute life, 5 tries.
+export const verificationCodes = sqliteTable(
+  "verification_codes",
+  {
+    id: id(),
+    email: text("email").notNull(),
+    purpose: text("purpose").notNull(), // OWNER_SIGNUP | OWNER_RESET | CLIENT_LOGIN
+    codeHash: text("code_hash").notNull(),
+    expiresAt: integer("expires_at", { mode: "timestamp_ms" }).notNull(),
+    attempts: integer("attempts").notNull().default(0),
+    used: integer("used", { mode: "boolean" }).notNull().default(false),
+    createdAt: createdAt(),
+  },
+  (t) => [index("verification_codes_email_idx").on(t.email, t.purpose)],
+);
+
+// One-time "scan to log in" QR codes for clients (10 minutes, single use). Token stored hashed.
+export const loginTokens = sqliteTable("login_tokens", {
+  tokenHash: text("token_hash").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  expiresAt: integer("expires_at", { mode: "timestamp_ms" }).notNull(),
+  usedAt: integer("used_at", { mode: "timestamp_ms" }),
+  createdAt: createdAt(),
+});
 
 // Small key/value store for salon settings (e.g. the staff access code).
 export const settings = sqliteTable("settings", {

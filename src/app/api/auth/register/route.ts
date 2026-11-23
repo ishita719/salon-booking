@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { getDb, schema } from "@/db";
 import { ApiError, clientIp, route } from "@/lib/api";
 import { startSession } from "@/lib/auth";
+import { phoneDigits } from "@/lib/identity";
 import { hashPassword } from "@/lib/password";
 import { rateLimit } from "@/lib/rate-limit";
 import { registerSchema } from "@/lib/validation";
@@ -18,7 +19,7 @@ export const POST = route(async (req) => {
 
   const [user] = await db
     .insert(schema.users)
-    .values({ name: data.name, email: data.email, phone: data.phone, passwordHash: await hashPassword(data.password), role: "CUSTOMER" })
+    .values({ name: data.name, email: data.email, phone: data.phone, phoneDigits: phoneDigits(data.phone), passwordHash: await hashPassword(data.password), role: "CUSTOMER" })
     .returning({ id: schema.users.id, role: schema.users.role });
   await startSession(user);
   return NextResponse.json({ ok: true, home: "/account" }, { status: 201 });

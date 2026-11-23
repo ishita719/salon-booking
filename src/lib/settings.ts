@@ -29,3 +29,24 @@ export function generateStaffCode(): string {
   const chars = [...bytes].map((b) => alphabet[b % alphabet.length]).join("");
   return `MM-${chars.slice(0, 4)}-${chars.slice(4)}`;
 }
+
+const OWNER_INVITES = "owner_invites";
+
+/** Emails an existing owner has invited to create a co-owner account. */
+export async function getOwnerInvites(): Promise<string[]> {
+  const row = await getDb().query.settings.findFirst({ where: eq(schema.settings.key, OWNER_INVITES) });
+  try {
+    const v = JSON.parse(row?.value ?? "[]");
+    return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+export async function setOwnerInvites(emails: string[]): Promise<void> {
+  const value = JSON.stringify([...new Set(emails)].slice(0, 20));
+  await getDb()
+    .insert(schema.settings)
+    .values({ key: OWNER_INVITES, value })
+    .onConflictDoUpdate({ target: schema.settings.key, set: { value, updatedAt: new Date() } });
+}

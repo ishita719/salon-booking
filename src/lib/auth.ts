@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { getDb, schema } from "@/db";
 import { homeFor, loginFor, parseRole, Role } from "./roles";
-import { SESSION_COOKIE, SESSION_MAX_AGE, signSession, STAFF_SESSION_MAX_AGE, verifySession } from "./session-token";
+import { CLIENT_DEVICE_MAX_AGE, SESSION_COOKIE, SESSION_MAX_AGE, signSession, STAFF_SESSION_MAX_AGE, verifySession } from "./session-token";
 import { getStaffCode, staffCodeFingerprint } from "./settings";
 
 export interface SessionUser {
@@ -15,9 +15,10 @@ export interface SessionUser {
   stylistId: string | null; // the staff member's bookable profile
 }
 
-export async function startSession(user: { id: string; role: string }, staffCode?: string) {
+/** rememberDevice: clients who sign in by QR / email code stay signed in on that phone for 6 months. */
+export async function startSession(user: { id: string; role: string }, staffCode?: string, rememberDevice = false) {
   const role = parseRole(user.role);
-  const maxAge = role === "STAFF" ? STAFF_SESSION_MAX_AGE : SESSION_MAX_AGE;
+  const maxAge = role === "STAFF" ? STAFF_SESSION_MAX_AGE : role === "CUSTOMER" && rememberDevice ? CLIENT_DEVICE_MAX_AGE : SESSION_MAX_AGE;
   const scv = role === "STAFF" && staffCode ? await staffCodeFingerprint(staffCode) : undefined;
   const token = await signSession(user.id, role, maxAge, scv);
   (await cookies()).set(SESSION_COOKIE, token, {

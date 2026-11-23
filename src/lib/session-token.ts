@@ -6,6 +6,7 @@ import { parseRole, Role } from "./roles";
 
 export const SESSION_COOKIE = "salon_session";
 export const SESSION_MAX_AGE = 60 * 60 * 24 * 7; // 7 days (clients, owner)
+export const CLIENT_DEVICE_MAX_AGE = 60 * 60 * 24 * 180; // 180 days — client signed in by QR / email code on their own phone
 export const STAFF_SESSION_MAX_AGE = 60 * 60 * 12; // 12 hours — staff re-enter the staff code each shift
 
 function secretKey(): Uint8Array {

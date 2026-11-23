@@ -37,7 +37,7 @@ export async function listFeedback(db: DB, where?: SQL, limit = 200) {
       dateLabel: formatDate(r.createdAt.toISOString().slice(0, 10)),
       clientName: u?.name ?? "Client",
       clientShortName: shortName(u?.name ?? "Client"),
-      clientEmail: u?.email ?? null,
+      clientEmail: u?.email && !u.email.endsWith("@no-email.invalid") ? u.email : null,
       stylistId: r.stylistId,
       stylistName: ss.find((s) => s.id === r.stylistId)?.name ?? null,
       appointmentId: r.appointmentId,

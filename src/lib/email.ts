@@ -4,6 +4,7 @@
 import { SALON } from "./config";
 
 export async function sendEmail(to: string, subject: string, text: string): Promise<void> {
+  if (to.endsWith("@no-email.invalid")) return; // QR clients who didn't give an email
   const key = process.env.RESEND_API_KEY;
   if (!key) {
     console.log(`\n[email → ${to}] ${subject}\n${text}\n`);

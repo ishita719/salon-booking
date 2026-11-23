@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { StatusBadge } from "@/components/AppointmentCard";
 import type { AppointmentDTO } from "@/lib/bookings";
+import LoginQrButton from "@/components/LoginQrButton";
 import { api } from "@/lib/client";
 
 interface Client {
@@ -82,7 +83,10 @@ export default function ClientsList() {
                     <td>{c.spentLabel}</td>
                     <td className="small">{c.lastVisitLabel}</td>
                     <td>{c.noShows ? <span className="badge badge-NO_SHOW">{c.noShows}</span> : 0}</td>
-                    <td><button className="btn btn-ghost btn-sm" onClick={() => toggle(c)}>{open === c.key ? "Hide" : "History"}</button></td>
+                    <td style={{ whiteSpace: "nowrap" }}>
+                      <button className="btn btn-ghost btn-sm" onClick={() => toggle(c)}>{open === c.key ? "Hide" : "History"}</button>{" "}
+                      {c.clientId && <LoginQrButton clientId={c.clientId} clientName={c.name} />}
+                    </td>
                   </tr>,
                 ];
                 if (open === c.key)

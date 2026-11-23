@@ -31,7 +31,7 @@ export const GET = route(async (req) => {
         formatTime(a.startMin),
         a.user?.name ?? a.guestName ?? "Walk-in",
         a.user?.phone ?? a.guestPhone ?? "",
-        a.user?.email ?? a.guestEmail ?? "",
+        (a.user?.email.endsWith("@no-email.invalid") ? "" : a.user?.email) ?? a.guestEmail ?? "",
         a.items.map((i) => i.name).join(" + "),
         a.stylist?.name ?? "",
         a.locationType === "HOME" ? `Home ${a.postalCode ?? ""}` : "Studio",

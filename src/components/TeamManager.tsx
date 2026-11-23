@@ -32,6 +32,58 @@ function WeekdayPicker({ value, onChange }: { value: number[]; onChange: (v: num
   );
 }
 
+/** Owners can invite a co-owner by email; only invited emails can create an owner account. */
+function CoOwnersPanel() {
+  const [data, setData] = useState<{ invites: string[]; owners: { name: string; email: string }[] } | null>(null);
+  const [email, setEmail] = useState("");
+  const [msg, setMsg] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
+  const load = useCallback(async () => setData(await api("/api/team/owner-invites")), []);
+  useEffect(() => {
+    load().catch((e) => setMsg({ kind: "error", text: e.message }));
+  }, [load]);
+
+  async function invite(e: FormEvent) {
+    e.preventDefault();
+    try {
+      await api("/api/team/owner-invites", { method: "POST", body: { email } });
+      setMsg({ kind: "ok", text: `${email} is invited. They create their account at /team/setup with this email (they'll get a verification code).` });
+      setEmail("");
+      await load();
+    } catch (err) {
+      setMsg({ kind: "error", text: (err as Error).message });
+    }
+  }
+  async function cancel(e: string) {
+    await api("/api/team/owner-invites", { method: "DELETE", body: { email: e } }).catch(() => {});
+    await load();
+  }
+
+  return (
+    <section className="card" style={{ marginBottom: 24 }}>
+      <h2 style={{ fontSize: "1.4rem", marginBottom: 4 }}>Co-owners</h2>
+      <p className="muted small">Owners log in with email + password + their own owner code. To add another owner, invite their email first.</p>
+      {msg && <div className={`alert alert-${msg.kind}`}>{msg.text}</div>}
+      {data && (
+        <div className="small" style={{ marginBottom: 12 }}>
+          <strong>Owners:</strong> {data.owners.map((o) => `${o.name} (${o.email})`).join(", ")}
+          {data.invites.length > 0 && (
+            <div style={{ marginTop: 6 }}>
+              <strong>Invited:</strong>{" "}
+              {data.invites.map((e) => (
+                <span key={e} className="chip" style={{ marginRight: 6 }}>{e}<button type="button" aria-label={`Cancel invite for ${e}`} onClick={() => cancel(e)}>×</button></span>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+      <form className="row" onSubmit={invite}>
+        <input type="email" required placeholder="co-owner@email.com" value={email} onChange={(e) => setEmail(e.target.value)} style={{ maxWidth: 300 }} aria-label="Co-owner email" />
+        <button className="btn btn-sm btn-ghost">Invite co-owner</button>
+      </form>
+    </section>
+  );
+}
+
 /** Owner sets the code staff need to create an account and to log in (every time). */
 function StaffCodePanel() {
   const [code, setCode] = useState<string | null | undefined>(undefined);
@@ -183,6 +235,7 @@ export default function TeamManager() {
       {flash && <div className={`alert alert-${flash.kind}`} role="status">{flash.text}</div>}
 
       <StaffCodePanel />
+      <CoOwnersPanel />
 
       {adding && (
         <form className="card" onSubmit={create} style={{ marginBottom: 20 }}>

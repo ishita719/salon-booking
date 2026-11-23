@@ -1,15 +1,14 @@
 import { eq } from "drizzle-orm";
 import type { Metadata } from "next";
-import { redirect } from "next/navigation";
-import TeamAuth from "@/components/TeamAuth";
+import OwnerAccountFlow from "@/components/OwnerAccountFlow";
 import { getDb, schema } from "@/db";
+import { getEnv } from "@/lib/env";
 
-export const metadata: Metadata = { title: "Owner setup" };
+export const metadata: Metadata = { title: "Create owner account" };
 export const dynamic = "force-dynamic";
 
-// One-time owner account creation. Once an owner exists, this page just sends you to the team login.
-export default async function OwnerSetupPage() {
+// New owner account. The first owner can sign up directly; later owners must be invited by an existing owner.
+export default async function OwnerSignupPage() {
   const owner = await getDb().query.users.findFirst({ where: eq(schema.users.role, "OWNER"), columns: { id: true } });
-  if (owner) redirect("/team?as=owner");
-  return <TeamAuth mode="setup" />;
+  return <OwnerAccountFlow mode="signup" firstOwner={!owner} setupCodeRequired={!!getEnv("SETUP_CODE")} />;
 }

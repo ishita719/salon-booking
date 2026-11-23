@@ -4,6 +4,9 @@ import { StatusBadge } from "@/components/AppointmentCard";
 import Stars from "@/components/Stars";
 import { pageUser } from "@/lib/auth";
 import { getStaffCode } from "@/lib/settings";
+import { eq } from "drizzle-orm";
+import { getDb, schema } from "@/db";
+import { TEMP_OWNER_CODE } from "@/lib/identity";
 import { getOwnerStats } from "@/lib/stats";
 import { formatDate } from "@/lib/time";
 
@@ -12,7 +15,11 @@ export const dynamic = "force-dynamic";
 
 export default async function OwnerDashboard() {
   const user = await pageUser(["OWNER"]);
-  const [s, staffCode] = await Promise.all([getOwnerStats(), getStaffCode()]);
+  const [s, staffCode, me] = await Promise.all([
+    getOwnerStats(),
+    getStaffCode(),
+    getDb().query.users.findFirst({ where: eq(schema.users.id, user.id), columns: { pinHash: true } }),
+  ]);
 
   const cards = [
     { label: "Revenue this month", value: s.revenueMonth, hint: "completed visits" },
@@ -36,10 +43,18 @@ export default async function OwnerDashboard() {
         </div>
         <div className="row">
           <Link href="/owner/insights" className="btn btn-ghost">📊 Insights</Link>
+          <Link href="/owner/qr" className="btn btn-ghost">📱 QR codes</Link>
           <Link href="/owner/appointments" className="btn btn-ghost">All appointments</Link>
           <Link href="/book" className="btn">New booking</Link>
         </div>
       </div>
+
+      {!me?.pinHash && (
+        <div className="alert alert-gold spread" style={{ marginTop: 16 }}>
+          <span><strong>You&apos;re using the temporary owner code ({TEMP_OWNER_CODE}).</strong> Set your own private owner code now.</span>
+          <Link href="/settings" className="btn btn-sm btn-gold">Set my owner code</Link>
+        </div>
+      )}
 
       {!staffCode && (
         <div className="alert alert-gold spread" style={{ marginTop: 16 }}>

@@ -4,6 +4,7 @@ import { getDb, schema } from "@/db";
 import { ApiError, requireOwner, route } from "@/lib/api";
 import { parseWorkDays } from "@/lib/bookings";
 import { ACTIVE_STATUSES } from "@/lib/config";
+import { phoneDigits } from "@/lib/identity";
 import { hashPassword } from "@/lib/password";
 import { salonNow } from "@/lib/time";
 import { teamCreateSchema } from "@/lib/validation";
@@ -53,7 +54,7 @@ export const POST = route(async (req) => {
   const userId = crypto.randomUUID();
   const stylistId = crypto.randomUUID();
   await db.batch([
-    db.insert(users).values({ id: userId, name: data.name, email: data.email, phone: data.phone, role: "STAFF", passwordHash: await hashPassword(data.password) }),
+    db.insert(users).values({ id: userId, name: data.name, email: data.email, phone: data.phone, phoneDigits: phoneDigits(data.phone), role: "STAFF", passwordHash: await hashPassword(data.password) }),
     db.insert(stylists).values({ id: stylistId, name: data.name, title: data.title, bio: data.bio, workDays: data.workDays, userId }),
   ]);
   return NextResponse.json({ id: stylistId }, { status: 201 });

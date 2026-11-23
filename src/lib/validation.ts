@@ -51,8 +51,10 @@ export const teamLoginSchema = z
     email: emailSchema,
     password: z.string().min(1, "Password is required").max(100),
     staffCode: z.string().trim().max(64).optional(),
+    ownerCode: z.string().trim().max(64).optional(),
   })
   .superRefine((v, ctx) => {
+    if (v.as === "OWNER" && (!v.ownerCode || v.ownerCode.length < 4)) ctx.addIssue({ code: "custom", message: "Enter your owner code" });
     if (v.as === "STAFF" && (!v.staffCode || v.staffCode.length < 4)) ctx.addIssue({ code: "custom", message: "Enter the staff code from the owner" });
   });
 
@@ -64,6 +66,50 @@ export const staffJoinSchema = z.object({
   password: passwordSchema,
   staffCode: codeField("Staff code"),
 });
+
+// Owner's personal code: 4–8 digits (like a bank card PIN).
+export const ownerCodeSchema = z.string({ required_error: "Choose an owner code" }).trim().regex(/^\d{4,8}$/, "Owner code: use 4 to 8 digits");
+const sixDigits = z.string({ required_error: "Enter the 6-digit code" }).trim().regex(/^\d{6}$/, "Enter the 6-digit code from the email");
+
+// QR sign-in for clients: just name + phone (email optional).
+export const quickJoinSchema = z.object({
+  name: trimmed(2, 80, "Name"),
+  phone: phoneSchema,
+  email: z.union([z.literal(""), emailSchema]).optional(),
+});
+
+export const emailCodeRequestSchema = z.object({
+  email: emailSchema,
+  purpose: z.enum(["CLIENT_LOGIN", "OWNER_RESET", "OWNER_SIGNUP"]),
+});
+
+export const emailLoginSchema = z.object({ email: emailSchema, code: sixDigits });
+
+export const ownerResetSchema = z.object({
+  email: emailSchema,
+  code: sixDigits,
+  newOwnerCode: ownerCodeSchema,
+  newPassword: z.union([z.literal(""), passwordSchema]).optional(),
+});
+
+export const ownerSignupSchema = z.object({
+  email: emailSchema,
+  code: sixDigits,
+  name: trimmed(2, 80, "Name"),
+  phone: phoneSchema,
+  password: passwordSchema,
+  ownerCode: ownerCodeSchema,
+  teamCode: z
+    .string()
+    .trim()
+    .min(6, "Team secret code: use at least 6 characters")
+    .max(32)
+    .regex(/^[A-Za-z0-9-]+$/, "Team secret code: use letters, numbers and dashes only")
+    .optional(),
+  setupCode: z.string().trim().max(64).optional(),
+});
+
+export const ownerInviteSchema = z.object({ email: emailSchema });
 
 // First-time owner setup (/team/setup) — only works while no owner exists, and needs SETUP_CODE.
 export const ownerSetupSchema = z.object({
@@ -108,6 +154,7 @@ export const feedbackUpdateSchema = z.object({
 export const profileSchema = z.object({
   name: trimmed(2, 80, "Name"),
   phone: phoneSchema,
+  email: z.union([z.literal(""), emailSchema]).optional(), // clients only: add/change email
 });
 
 export const dateSchema = z.string().refine(isValidDateString, "Choose a valid date");

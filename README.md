@@ -16,6 +16,17 @@ Code lives on GitHub; Cloudflare rebuilds and publishes the site on every push.
 
 **Staff (`/team` → Staff + team secret code):** own schedule, take payment at the salon, time off, book walk-ins, own reviews.
 
+## Easy sign-in
+
+- **Clients — no account form:** the owner prints the salon QR (**Owner → Manage → QR codes**). Clients scan it, type **name + phone** (email optional) and they're in — signed in on that phone for 6 months, no password.
+  - Same phone number again? For safety it never logs in by number alone: clients with an email get a **6-digit email code**; others ask the front desk, where staff/owner tap **📱 Login QR** (one-time, 10 minutes).
+  - Clients can also log in with **"Email me a code"**, set an optional password, or show a login QR to sign in on another device (Settings).
+- **Owner:** email + password + **owner code** (4–8 digits). Temporary code until changed: **0092** (the dashboard reminds you to change it in Settings).
+  - **Forgot owner code?** → email → 6-digit code → set a new code (and optionally a new password).
+  - **New owner account** (`/team/setup`): email verified by a 6-digit code + password + owner code. The first owner also sets the staff team code; later owners must first be **invited by an existing owner** (Owner → Team → Co-owners).
+- **Staff:** email + password + the team secret code (unchanged).
+- Email codes need `RESEND_API_KEY` in production. In local development without it, the code is shown on screen in a yellow "Test mode" box.
+
 ## Who uses it
 
 | | **Client** | **Staff** | **Owner** |
