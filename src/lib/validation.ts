@@ -71,7 +71,7 @@ export const quickJoinSchema = z.object({
 
 export const emailCodeRequestSchema = z.object({
   email: emailSchema,
-  purpose: z.enum(["OWNER_RESET", "OWNER_SIGNUP"]), // email codes are for owners only (clients use QR)
+  purpose: z.enum(["OWNER_RESET"]), // email codes: owner "forgot secret code" only
 });
 
 export const emailLoginSchema = z.object({ email: emailSchema, code: sixDigits });
@@ -97,7 +97,6 @@ export const ownerSignupSchema = z.object({
   setupCode: z.string().trim().max(64).optional(),
 });
 
-export const ownerInviteSchema = z.object({ email: emailSchema });
 
 // First-time owner setup (/team/setup) — only works while no owner exists, and needs SETUP_CODE.
 export const ownerSetupSchema = z.object({

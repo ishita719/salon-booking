@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getDb } from "@/db";
 import { ApiError, clientIp, route } from "@/lib/api";
 import { startSession } from "@/lib/auth";
-import { assertOwnerLoginOpen, clearOwnerLoginFailures, findOwnerByCode, recordOwnerLoginFailure } from "@/lib/identity";
+import { assertOwnerLoginOpen, clearOwnerLoginFailures, findOwnerByCode, findPendingOwnerByCode, recordOwnerLoginFailure } from "@/lib/identity";
 import { rateLimit } from "@/lib/rate-limit";
 import { ownerLoginSchema } from "@/lib/validation";
 
@@ -15,6 +15,7 @@ export const POST = route(async (req) => {
   await assertOwnerLoginOpen(db);
   const owner = await findOwnerByCode(db, code);
   if (!owner) {
+    if (await findPendingOwnerByCode(db, code)) throw new ApiError(403, "Your owner account is waiting for approval. An existing owner needs to approve it on Owner → Team.");
     await recordOwnerLoginFailure(db);
     throw new ApiError(401, "That secret code isn't right.");
   }

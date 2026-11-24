@@ -32,54 +32,58 @@ function WeekdayPicker({ value, onChange }: { value: number[]; onChange: (v: num
   );
 }
 
-/** Owners can invite a co-owner by email; only invited emails can create an owner account. */
+/** Owners see co-owners and approve or decline new owner accounts (sign-ups wait here until approved). */
 function CoOwnersPanel() {
-  const [data, setData] = useState<{ invites: string[]; owners: { name: string; email: string }[] } | null>(null);
-  const [email, setEmail] = useState("");
+  type Pending = { id: string; name: string; email: string; createdAt: string };
+  const [data, setData] = useState<{ owners: { name: string; email: string }[]; pending: Pending[] } | null>(null);
   const [msg, setMsg] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
-  const load = useCallback(async () => setData(await api("/api/team/owner-invites")), []);
+  const load = useCallback(async () => setData(await api("/api/team/owner-requests")), []);
   useEffect(() => {
     load().catch((e) => setMsg({ kind: "error", text: e.message }));
   }, [load]);
 
-  async function invite(e: FormEvent) {
-    e.preventDefault();
+  async function decide(p: Pending, action: "approve" | "decline") {
+    const q = action === "approve"
+      ? `Make ${p.name} (${p.email}) an owner? Owners can see every client, booking and payment.`
+      : `Decline and delete the owner request from ${p.name} (${p.email})?`;
+    if (!window.confirm(q)) return;
     try {
-      await api("/api/team/owner-invites", { method: "POST", body: { email } });
-      setMsg({ kind: "ok", text: `${email} is invited. They create their account at /team/setup with this email (they'll get a verification code).` });
-      setEmail("");
+      await api("/api/team/owner-requests", { method: "POST", body: { id: p.id, action } });
+      setMsg({ kind: "ok", text: action === "approve" ? `${p.name} is now an owner and can log in with their secret code.` : `The request from ${p.name} was declined.` });
       await load();
     } catch (err) {
       setMsg({ kind: "error", text: (err as Error).message });
     }
   }
-  async function cancel(e: string) {
-    await api("/api/team/owner-invites", { method: "DELETE", body: { email: e } }).catch(() => {});
-    await load();
-  }
 
   return (
     <section className="card" style={{ marginBottom: 24 }}>
       <h2 style={{ fontSize: "1.4rem", marginBottom: 4 }}>Co-owners</h2>
-      <p className="muted small">Owners log in with their own secret code. To add another owner, invite their email first.</p>
+      <p className="muted small">New owners sign up at <strong>/team/setup</strong> (name, email, secret code). Their account works only after you approve it here.</p>
       {msg && <div className={`alert alert-${msg.kind}`}>{msg.text}</div>}
       {data && (
-        <div className="small" style={{ marginBottom: 12 }}>
-          <strong>Owners:</strong> {data.owners.map((o) => `${o.name} (${o.email})`).join(", ")}
-          {data.invites.length > 0 && (
-            <div style={{ marginTop: 6 }}>
-              <strong>Invited:</strong>{" "}
-              {data.invites.map((e) => (
-                <span key={e} className="chip" style={{ marginRight: 6 }}>{e}<button type="button" aria-label={`Cancel invite for ${e}`} onClick={() => cancel(e)}>×</button></span>
+        <>
+          <div className="small" style={{ marginBottom: 12 }}>
+            <strong>Owners:</strong> {data.owners.map((o) => `${o.name} (${o.email})`).join(", ")}
+          </div>
+          {data.pending.length > 0 ? (
+            <div>
+              <strong className="small">Waiting for approval</strong>
+              {data.pending.map((p) => (
+                <div key={p.id} className="spread" style={{ padding: "10px 0", borderTop: "1px solid var(--line)", gap: 10, flexWrap: "wrap" }}>
+                  <span className="small"><strong>{p.name}</strong> · {p.email} · asked {new Date(p.createdAt).toLocaleDateString()}</span>
+                  <span className="row" style={{ gap: 8 }}>
+                    <button type="button" className="btn btn-sm" onClick={() => decide(p, "approve")}>Approve</button>
+                    <button type="button" className="btn btn-sm btn-ghost" onClick={() => decide(p, "decline")}>Decline</button>
+                  </span>
+                </div>
               ))}
             </div>
+          ) : (
+            <p className="small muted" style={{ margin: 0 }}>No owner requests waiting.</p>
           )}
-        </div>
+        </>
       )}
-      <form className="row" onSubmit={invite}>
-        <input type="email" required placeholder="co-owner@email.com" value={email} onChange={(e) => setEmail(e.target.value)} style={{ maxWidth: 300 }} aria-label="Co-owner email" />
-        <button className="btn btn-sm btn-ghost">Invite co-owner</button>
-      </form>
     </section>
   );
 }

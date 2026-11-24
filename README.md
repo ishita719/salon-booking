@@ -26,7 +26,7 @@ Code lives on GitHub; Cloudflare rebuilds and publishes the site on every push.
 - **Owner:** **secret code only** (Team login → Owner). Temporary code until changed: **0092** — short and easy to guess, so change it right away in **Settings → Secret code** (6–32 letters, numbers or dashes; every owner's code must be different).
   - 10 wrong codes in 15 minutes locks owner login for 15 minutes (for everyone).
   - **Forgot secret code?** → owner email → 6-digit code → set a new secret code.
-  - **New owner account** (`/team/setup`): name + email + secret code. The first owner also sets the staff team code (and `SETUP_CODE` if configured); later owners must first be **invited by an existing owner** (Owner → Team → Co-owners).
+  - **New owner account** (`/team/setup`): name + email + secret code — no invite needed. The very first owner is active at once (and also sets the staff team code, plus `SETUP_CODE` if configured). Every later owner account **waits for approval**: existing owners see it on the dashboard and approve or decline it on **Owner → Team → Co-owners** (they also get an email). Until then that secret code can't log in.
 - **Staff:** email + password + the team secret code (unchanged).
 - Owner email codes need `RESEND_API_KEY` in production. In local development without it, the code is shown on screen in a yellow "Test mode" box.
 
@@ -35,7 +35,7 @@ Code lives on GitHub; Cloudflare rebuilds and publishes the site on every push.
 | | **Client** | **Staff** | **Owner** |
 |---|---|---|---|
 | Login page | `/login` (client login) | `/team` → **Staff** | `/team` → **Owner** |
-| Sign up | scan the QR, or name + phone | `/team/join` — needs the **staff code** | `/team/setup` — name + email + secret code (invite needed after the first owner) |
+| Sign up | scan the QR, or name + phone | `/team/join` — needs the **staff code** | `/team/setup` — name + email + secret code (approved by an existing owner) |
 | At every login | QR, or first name + phone | email + password + **staff code** | **secret code** only |
 | Can do | book, reschedule/cancel own bookings, **send feedback** | own schedule, confirm/done/no-show, move/cancel own bookings, time off, book walk-ins, read own reviews | everything: dashboard, all appointments, team, **staff code**, clients, feedback, services |
 

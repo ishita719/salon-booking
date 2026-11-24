@@ -3,7 +3,7 @@ import Link from "next/link";
 import { StatusBadge } from "@/components/AppointmentCard";
 import Stars from "@/components/Stars";
 import { pageUser } from "@/lib/auth";
-import { getStaffCode } from "@/lib/settings";
+import { getPendingOwnerIds, getStaffCode } from "@/lib/settings";
 import { eq } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 import { TEMP_OWNER_CODE } from "@/lib/identity";
@@ -15,9 +15,10 @@ export const dynamic = "force-dynamic";
 
 export default async function OwnerDashboard() {
   const user = await pageUser(["OWNER"]);
-  const [s, staffCode, me] = await Promise.all([
+  const [s, staffCode, pendingOwners, me] = await Promise.all([
     getOwnerStats(),
     getStaffCode(),
+    getPendingOwnerIds(),
     getDb().query.users.findFirst({ where: eq(schema.users.id, user.id), columns: { pinHash: true } }),
   ]);
 
@@ -48,6 +49,13 @@ export default async function OwnerDashboard() {
           <Link href="/book" className="btn">New booking</Link>
         </div>
       </div>
+
+      {pendingOwners.length > 0 && (
+        <div className="alert alert-info spread" style={{ marginTop: 16 }}>
+          <span><strong>{pendingOwners.length === 1 ? "1 new owner account is" : `${pendingOwners.length} new owner accounts are`} waiting for your approval.</strong> Only approve people you know.</span>
+          <Link href="/owner/team" className="btn btn-sm">Review</Link>
+        </div>
+      )}
 
       {!me?.pinHash && (
         <div className="alert alert-gold spread" style={{ marginTop: 16 }}>

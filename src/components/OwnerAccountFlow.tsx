@@ -22,6 +22,7 @@ export default function OwnerAccountFlow({ mode, firstOwner = false, setupCodeRe
   const [info, setInfo] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [submitted, setSubmitted] = useState<string | null>(null); // owner request sent, waiting for approval
 
   const go = (home: string) => {
     router.push(home);
@@ -56,8 +57,13 @@ export default function OwnerAccountFlow({ mode, firstOwner = false, setupCodeRe
     }
     delete f.repeat;
     try {
-      const r = await api<{ home: string }>(signup ? "/api/auth/owner-setup" : "/api/auth/owner-reset", { method: "POST", body: signup ? f : { ...f, email } });
-      go(r.home);
+      const r = await api<{ home?: string; pending?: boolean }>(signup ? "/api/auth/owner-setup" : "/api/auth/owner-reset", { method: "POST", body: signup ? f : { ...f, email } });
+      if (r.pending) {
+        setSubmitted(f.name?.split(" ")[0] ?? "");
+        setBusy(false);
+        return;
+      }
+      go(r.home ?? "/owner");
     } catch (err) {
       setError((err as Error).message);
       setBusy(false);
@@ -74,7 +80,7 @@ export default function OwnerAccountFlow({ mode, firstOwner = false, setupCodeRe
             {signup
               ? firstOwner
                 ? "Set up the salon's first owner: your name, email and a secret code. You'll log in with the secret code only."
-                : "Your email must first be invited by an existing owner (Owner → Team → Co-owners)."
+                : "Enter your name, email and a secret code. An existing owner approves new owner accounts, then you log in with your secret code."
               : "We'll email you a 6-digit code to prove it's you, then you choose a new secret code."}
           </p>
         </div>
@@ -89,7 +95,12 @@ export default function OwnerAccountFlow({ mode, firstOwner = false, setupCodeRe
           {error && <div className="alert alert-error" role="alert">{error}</div>}
           {info && <div className="alert alert-gold small">{info}</div>}
 
-          {!signup && step === "email" ? (
+          {submitted !== null ? (
+            <div className="alert alert-ok" role="status">
+              <strong>Thanks{submitted ? `, ${submitted}` : ""}! Your owner account is created.</strong>
+              <p className="small" style={{ margin: "8px 0 0" }}>An existing owner just needs to approve it (Owner → Team). After that, log in with your secret code on the owner login page.</p>
+            </div>
+          ) : !signup && step === "email" ? (
             <form onSubmit={sendResetCode}>
               <div className="field">
                 <label htmlFor="o-email">Your owner email</label>

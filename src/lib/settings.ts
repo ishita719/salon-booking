@@ -30,11 +30,11 @@ export function generateStaffCode(): string {
   return `MM-${chars.slice(0, 4)}-${chars.slice(4)}`;
 }
 
-const OWNER_INVITES = "owner_invites";
+const PENDING_OWNERS = "owner_pending";
 
-/** Emails an existing owner has invited to create a co-owner account. */
-export async function getOwnerInvites(): Promise<string[]> {
-  const row = await getDb().query.settings.findFirst({ where: eq(schema.settings.key, OWNER_INVITES) });
+/** User ids of owner accounts waiting for an existing owner to approve them (max 20). */
+export async function getPendingOwnerIds(): Promise<string[]> {
+  const row = await getDb().query.settings.findFirst({ where: eq(schema.settings.key, PENDING_OWNERS) });
   try {
     const v = JSON.parse(row?.value ?? "[]");
     return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [];
@@ -43,10 +43,10 @@ export async function getOwnerInvites(): Promise<string[]> {
   }
 }
 
-export async function setOwnerInvites(emails: string[]): Promise<void> {
-  const value = JSON.stringify([...new Set(emails)].slice(0, 20));
+export async function setPendingOwnerIds(ids: string[]): Promise<void> {
+  const value = JSON.stringify([...new Set(ids)].slice(0, 20));
   await getDb()
     .insert(schema.settings)
-    .values({ key: OWNER_INVITES, value })
+    .values({ key: PENDING_OWNERS, value })
     .onConflictDoUpdate({ target: schema.settings.key, set: { value, updatedAt: new Date() } });
 }

@@ -7,6 +7,7 @@ import { SALON } from "./config";
 import { sendEmail } from "./email";
 import { getEnv } from "./env";
 import { codesMatch, safeEqual, sha256Hex, verifyPassword } from "./password";
+import { getPendingOwnerIds } from "./settings";
 
 /** Temporary owner code until the owner sets their own (Settings → Owner code). */
 export const TEMP_OWNER_CODE = "0092";
@@ -105,6 +106,15 @@ export async function consumeLoginToken(db: DB, token: string): Promise<string |
 export async function findOwnerByCode(db: DB, code: string) {
   const owners = await db.select().from(schema.users).where(and(eq(schema.users.role, "OWNER"), eq(schema.users.active, true)));
   for (const o of owners) if (await ownerCodeMatches(o, code)) return o;
+  return null;
+}
+
+/** An owner account that signed up but is still waiting for approval. */
+export async function findPendingOwnerByCode(db: DB, code: string) {
+  const ids = await getPendingOwnerIds();
+  if (!ids.length) return null;
+  const owners = await db.select().from(schema.users).where(and(eq(schema.users.role, "OWNER"), eq(schema.users.active, false)));
+  for (const o of owners) if (ids.includes(o.id) && (await ownerCodeMatches(o, code))) return o;
   return null;
 }
 
