@@ -3,14 +3,22 @@ import { NextResponse } from "next/server";
 import { getDb, schema } from "@/db";
 import { ApiError, clientIp, route } from "@/lib/api";
 import { startSession } from "@/lib/auth";
-import { NO_PASSWORD, phoneDigits, placeholderEmail } from "@/lib/identity";
+import { SALON } from "@/lib/config";
+import { sendEmail } from "@/lib/email";
+import { NO_PASSWORD, phoneDigits, placeholderEmail, realEmail } from "@/lib/identity";
 import { rateLimit } from "@/lib/rate-limit";
 import { quickJoinSchema } from "@/lib/validation";
 
-// Clients sign in ONLY with QR codes:
-//  • New client: scan the salon QR → name + phone → signed in on this phone (no password).
-//  • Returning client on a new phone: typing a number that already has an account never logs anyone in
-//    (anyone could type someone's number) — they scan a one-time login QR from the front desk or their other phone.
+/** First name, compared without case, accents or extra spaces ("  émma " = "Emma"). */
+function firstName(name: string, display = false): string {
+  const f = name.trim().split(/\s+/)[0] ?? "";
+  return display ? f : f.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+}
+
+// Client sign-in with name + phone (what the salon QR opens; also the fallback when scanning doesn't work):
+//  • New number  → account created, signed in on this phone (no password).
+//  • Known number → signed in if the FIRST NAME matches the account. Wrong tries are limited, and the client
+//    gets an email (if they gave one) when a new phone signs in. A one-time login QR is the safer option.
 export const POST = route(async (req) => {
   const ip = clientIp(req);
   rateLimit(`quick-join:${ip}`, 12, 60 * 60 * 1000);
@@ -23,10 +31,21 @@ export const POST = route(async (req) => {
   const existing = await db.query.users.findFirst({ where: and(eq(u.phoneDigits, digits), eq(u.role, "CUSTOMER")) });
   if (existing) {
     if (!existing.active) throw new ApiError(403, "This account has been deactivated. Please contact the salon.");
-    throw new ApiError(
-      409,
-      "Welcome back! This number already has an account. To log in on this phone, scan your login QR: ask at the front desk, or open Settings → “Show my login QR” on your other phone.",
-    );
+    rateLimit(`client-login:${digits}`, 5, 60 * 60 * 1000); // slows down guessing names for a number
+    rateLimit(`client-login-ip:${ip}`, 10, 60 * 60 * 1000);
+    if (firstName(existing.name) !== firstName(data.name)) {
+      throw new ApiError(401, "That name doesn't match the account for this phone number. Use the first name you signed up with, or ask the front desk for your login QR.");
+    }
+    await startSession(existing, undefined, true);
+    const email = realEmail(existing.email);
+    if (email) {
+      await sendEmail(
+        email,
+        `New sign-in to your ${SALON.name} account`,
+        `Hi ${firstName(existing.name, true)},\n\nYour account was just opened on a new phone using your name and number.\nIf this wasn't you, please call us at ${SALON.phone}.`,
+      );
+    }
+    return NextResponse.json({ ok: true, home: "/account?welcome=1", returning: true });
   }
 
   const email = data.email || null;

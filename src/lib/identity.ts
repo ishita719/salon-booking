@@ -51,7 +51,7 @@ export async function sendVerificationCode(db: DB, email: string, purpose: CodeP
   const code = String(n).padStart(6, "0");
   const id = crypto.randomUUID();
   await db.insert(schema.verificationCodes).values({ id, email, purpose, codeHash: await hashCode(id, code), expiresAt: new Date(Date.now() + CODE_TTL_MS) });
-  const what = purpose === "OWNER_RESET" ? "reset your owner code" : "create your owner account";
+  const what = purpose === "OWNER_RESET" ? "reset your owner secret code" : "create your owner account";
   await sendEmail(email, `${code} is your ${SALON.name} code`, `Your verification code to ${what} is:\n\n    ${code}\n\nIt expires in 10 minutes. If you didn't ask for this, you can ignore this email.`);
   const devMode = process.env.NODE_ENV !== "production" && !getEnv("RESEND_API_KEY");
   return devMode ? { devCode: code } : {};
@@ -97,4 +97,61 @@ export async function consumeLoginToken(db: DB, token: string): Promise<string |
     .where(and(eq(t.tokenHash, tokenHash), isNull(t.usedAt), gt(t.expiresAt, new Date())))
     .returning({ userId: t.userId });
   return row?.userId ?? null;
+}
+
+// ---------- Owner login by secret code ----------
+
+/** The active owner whose secret code matches (owners still on the temporary code match TEMP_OWNER_CODE). */
+export async function findOwnerByCode(db: DB, code: string) {
+  const owners = await db.select().from(schema.users).where(and(eq(schema.users.role, "OWNER"), eq(schema.users.active, true)));
+  for (const o of owners) if (await ownerCodeMatches(o, code)) return o;
+  return null;
+}
+
+/** Secret codes must be unique between owners (the code alone identifies who is logging in). */
+export async function ownerCodeInUse(db: DB, code: string, exceptUserId?: string): Promise<boolean> {
+  if (await codesMatch(code, TEMP_OWNER_CODE)) return true;
+  const owners = await db.select().from(schema.users).where(eq(schema.users.role, "OWNER"));
+  for (const o of owners) if (o.id !== exceptUserId && o.pinHash && (await ownerCodeMatches(o, code))) return true;
+  return false;
+}
+
+// Lockout across ALL devices (stored in the database): 10 wrong secret codes within 15 minutes → owner login closed for 15 minutes.
+const GUARD_KEY = "owner_login_guard";
+const GUARD_WINDOW = 15 * 60 * 1000;
+const GUARD_MAX = 10;
+type Guard = { fails: number; since: number; lockedUntil: number };
+
+async function readGuard(db: DB): Promise<Guard> {
+  const row = await db.query.settings.findFirst({ where: eq(schema.settings.key, GUARD_KEY) });
+  try {
+    const g = JSON.parse(row?.value ?? "{}") as Partial<Guard>;
+    return { fails: g.fails ?? 0, since: g.since ?? 0, lockedUntil: g.lockedUntil ?? 0 };
+  } catch {
+    return { fails: 0, since: 0, lockedUntil: 0 };
+  }
+}
+async function writeGuard(db: DB, g: Guard) {
+  const value = JSON.stringify(g);
+  await db.insert(schema.settings).values({ key: GUARD_KEY, value }).onConflictDoUpdate({ target: schema.settings.key, set: { value, updatedAt: new Date() } });
+}
+
+export async function assertOwnerLoginOpen(db: DB) {
+  const g = await readGuard(db);
+  if (g.lockedUntil > Date.now()) {
+    const mins = Math.ceil((g.lockedUntil - Date.now()) / 60000);
+    throw new ApiError(429, `Too many wrong secret codes. Owner login is locked for ${mins} more minute(s). Forgot your code? Use “Forgot secret code”.`);
+  }
+}
+
+export async function recordOwnerLoginFailure(db: DB) {
+  const now = Date.now();
+  const g = await readGuard(db);
+  const fresh = now - g.since > GUARD_WINDOW;
+  const fails = (fresh ? 0 : g.fails) + 1;
+  await writeGuard(db, { fails, since: fresh ? now : g.since, lockedUntil: fails >= GUARD_MAX ? now + GUARD_WINDOW : 0 });
+}
+
+export async function clearOwnerLoginFailures(db: DB) {
+  await writeGuard(db, { fails: 0, since: 0, lockedUntil: 0 });
 }

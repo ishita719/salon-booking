@@ -57,12 +57,12 @@ export default function SettingsView({ embedded }: { embedded?: boolean }) {
     e.preventDefault();
     const form = e.currentTarget;
     const f = Object.fromEntries(new FormData(form)) as Record<string, string>;
-    if (f.newCode !== f.newCode2) return setFlash({ kind: "error", text: "The two owner codes don't match." });
+    if (f.newCode !== f.newCode2) return setFlash({ kind: "error", text: "The two secret codes don't match." });
     try {
-      await api("/api/me/owner-code", { method: "PATCH", body: { currentPassword: f.currentPassword, newCode: f.newCode } });
+      await api("/api/me/owner-code", { method: "PATCH", body: { currentCode: f.currentCode, newCode: f.newCode } });
       form.reset();
       setTempCode(false);
-      ok("Owner code changed. Use it next time you log in.");
+      ok("Secret code changed. Use it next time you log in.");
     } catch (err) {
       fail(err);
     }
@@ -90,7 +90,7 @@ export default function SettingsView({ embedded }: { embedded?: boolean }) {
             <button className="btn">Save profile</button>
           </form>
 
-          {!client && (
+          {user.role === "STAFF" && (
           <form className="card" onSubmit={changePassword}>
             <h3>{user.hasPassword ? "Change password" : "Set a password (optional)"}</h3>
             {!user.hasPassword && <p className="small muted">You signed up with the salon QR — no password needed. Add one only if you&apos;d like to log in with email + password.</p>}
@@ -107,15 +107,17 @@ export default function SettingsView({ embedded }: { embedded?: boolean }) {
 
           {user.role === "OWNER" && (
             <form className="card" onSubmit={changeOwnerCode}>
-              <h3>Owner code</h3>
-              {tempCode && <div className="alert alert-gold small">You&apos;re still using the temporary owner code. Please set your own.</div>}
-              <p className="small muted">Asked at every owner login, together with your password. Forgot it? Use “Forgot owner code” on the team login page.</p>
-              <div className="field"><label htmlFor="oc-pw">Your password</label><input id="oc-pw" name="currentPassword" type="password" required autoComplete="current-password" /></div>
-              <div className="row" style={{ alignItems: "flex-start" }}>
-                <div className="field" style={{ flex: 1 }}><label htmlFor="oc-new">New owner code</label><input id="oc-new" name="newCode" type="password" inputMode="numeric" required pattern="\d{4,8}" maxLength={8} className="code-input" placeholder="4–8 digits" autoComplete="off" /></div>
-                <div className="field" style={{ flex: 1 }}><label htmlFor="oc-new2">Repeat</label><input id="oc-new2" name="newCode2" type="password" inputMode="numeric" required pattern="\d{4,8}" maxLength={8} className="code-input" autoComplete="off" /></div>
+              <h3>Secret code</h3>
+              {tempCode && <div className="alert alert-gold small">You&apos;re still using the temporary code — it&apos;s short and easy to guess. Please set your own now.</div>}
+              <p className="small muted">Your secret code is your owner login. Forgot it? Use “Forgot secret code” on the owner login page.</p>
+              <div className="field"><label htmlFor="oc-cur">Current secret code</label><input id="oc-cur" name="currentCode" type="password" required className="code-input" autoComplete="current-password" /></div>
+              <div className="field">
+                <label htmlFor="oc-new">New secret code</label>
+                <input id="oc-new" name="newCode" type="password" required minLength={6} maxLength={32} pattern="[A-Za-z0-9\-]+" className="code-input" autoComplete="new-password" spellCheck={false} />
+                <div className="hint">6–32 letters, numbers or dashes — e.g. Maple-Owner-26.</div>
               </div>
-              <button className="btn">Change owner code</button>
+              <div className="field"><label htmlFor="oc-new2">Repeat new secret code</label><input id="oc-new2" name="newCode2" type="password" required minLength={6} maxLength={32} className="code-input" autoComplete="new-password" /></div>
+              <button className="btn">Change secret code</button>
             </form>
           )}
 

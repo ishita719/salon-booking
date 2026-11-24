@@ -3,14 +3,13 @@ import { NextResponse } from "next/server";
 import { getDb, schema } from "@/db";
 import { ApiError, clientIp, route } from "@/lib/api";
 import { startSession } from "@/lib/auth";
-import { ownerCodeMatches } from "@/lib/identity";
 import { codesMatch, DUMMY_HASH, verifyPassword } from "@/lib/password";
 import { rateLimit } from "@/lib/rate-limit";
 import { homeFor, parseRole } from "@/lib/roles";
 import { getStaffCode } from "@/lib/settings";
 import { teamLoginSchema } from "@/lib/validation";
 
-// TEAM login (/team): the owner logs in with email + password; staff ALSO need the current staff code every time.
+// STAFF login (/team → Staff): email + password + the current staff code, every time. Owners use /api/auth/owner-login.
 export const POST = route(async (req) => {
   const data = teamLoginSchema.parse(await req.json());
   const ip = clientIp(req);
@@ -23,12 +22,8 @@ export const POST = route(async (req) => {
 
   const role = parseRole(user.role);
   if (role === "CUSTOMER") throw new ApiError(403, "This is the salon team login. Clients: please use the client login.");
-  if (role !== data.as) throw new ApiError(403, `This is ${role === "OWNER" ? "the owner" : "a staff"} account — choose "${role === "OWNER" ? "Owner" : "Staff"}" above.`);
+  if (role === "OWNER") throw new ApiError(403, "Owners log in with their secret code — choose “Owner” above.");
   if (!user.active) throw new ApiError(403, "This account has been deactivated. Please contact the salon owner.");
-
-  if (role === "OWNER" && !(await ownerCodeMatches(user, data.ownerCode ?? ""))) {
-    throw new ApiError(403, "The owner code is incorrect. Forgot it? Use “Forgot owner code” to reset it by email.");
-  }
 
   let staffCode: string | undefined;
   if (role === "STAFF") {

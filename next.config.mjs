@@ -1,5 +1,5 @@
 import { initOpenNextCloudflareForDev } from "@opennextjs/cloudflare";
-import { homedir } from "node:os";
+import { homedir, networkInterfaces } from "node:os";
 import { join } from "node:path";
 
 // Lets `next dev` use Cloudflare bindings (the local D1 database) exactly like production.
@@ -21,9 +21,16 @@ const csp = [
   "form-action 'self'",
 ].join("; ");
 
+// While testing on your PC, let phones on the same Wi-Fi open the dev site (e.g. by scanning a QR code).
+const lanAddresses = Object.values(networkInterfaces())
+  .flat()
+  .filter((a) => a && a.family === "IPv4" && !a.internal)
+  .map((a) => a.address);
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   poweredByHeader: false,
+  allowedDevOrigins: lanAddresses,
   // Clients sign in with the salon QR code only — the old sign-up page now points to the QR login page.
   async redirects() {
     return [{ source: "/register", destination: "/login", permanent: false }];

@@ -4,6 +4,7 @@ import { z } from "zod";
 import { getDb, schema } from "@/db";
 import { ApiError, clientIp, isTeam, requireUser, route } from "@/lib/api";
 import { createLoginToken } from "@/lib/identity";
+import { publicOrigin } from "@/lib/origin";
 import { rateLimit } from "@/lib/rate-limit";
 
 // Makes a one-time "scan to log in" QR (valid 10 minutes, works once).
@@ -26,5 +27,5 @@ export const POST = route(async (req) => {
   }
 
   const { token, expiresAt } = await createLoginToken(db, targetId);
-  return NextResponse.json({ url: `${new URL(req.url).origin}/q/${token}`, expiresAt: expiresAt.toISOString() });
+  return NextResponse.json({ url: `${await publicOrigin()}/q/${token}`, expiresAt: expiresAt.toISOString() });
 });

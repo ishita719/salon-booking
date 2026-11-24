@@ -18,13 +18,15 @@ Code lives on GitHub; Cloudflare rebuilds and publishes the site on every push.
 
 ## Easy sign-in
 
-- **Clients — QR only (no passwords, no sign-up forms, no email codes):**
+- **Clients — QR first, name + phone as backup (no passwords, no sign-up forms):**
   - **New client:** scan the salon QR (print it from **Owner → Manage → QR codes**) → type name + phone (email optional, only for confirmations) → signed in on that phone for 6 months.
-  - **On a computer:** the Client login page (`/login`) shows the QR — scan it with your phone. Already on your phone? "Continue on this phone".
-  - **Returning client on a new phone:** a number that already has an account never logs in by itself (anyone could type someone's number). They scan a one-time **login QR** (10 minutes, works once) — shown by the front desk (Owner → Clients, or staff on the appointment: **📱 Login QR**) or from their other phone (**Settings → Show my login QR**).
-- **Owner:** email + password + **owner code** (4–8 digits). Temporary code until changed: **0092** (the dashboard reminds you to change it in Settings).
-  - **Forgot owner code?** → email → 6-digit code → set a new code (and optionally a new password).
-  - **New owner account** (`/team/setup`): email verified by a 6-digit code + password + owner code. The first owner also sets the staff team code; later owners must first be **invited by an existing owner** (Owner → Team → Co-owners).
+  - **On a computer:** the Client login page (`/login`) shows the QR. While testing locally the QR uses your PC's network address (e.g. `http://192.168.x.x:3000`), so a phone on the same Wi-Fi can open it.
+  - **QR not working?** "Log in with name & phone": a returning client types their first name + phone number. The first name must match the account; 5 tries per number per hour, and a "new sign-in" email is sent if the client has an email. (Weaker than the QR — anyone who knows a client's name and number could log in.)
+  - **Front-desk login QR** (one-time, 10 minutes) still works: Owner → Clients or staff on an appointment → **📱 Login QR**.
+- **Owner:** **secret code only** (Team login → Owner). Temporary code until changed: **0092** — short and easy to guess, so change it right away in **Settings → Secret code** (6–32 letters, numbers or dashes; every owner's code must be different).
+  - 10 wrong codes in 15 minutes locks owner login for 15 minutes (for everyone).
+  - **Forgot secret code?** → owner email → 6-digit code → set a new secret code.
+  - **New owner account** (`/team/setup`): name + email + secret code. The first owner also sets the staff team code (and `SETUP_CODE` if configured); later owners must first be **invited by an existing owner** (Owner → Team → Co-owners).
 - **Staff:** email + password + the team secret code (unchanged).
 - Owner email codes need `RESEND_API_KEY` in production. In local development without it, the code is shown on screen in a yellow "Test mode" box.
 
@@ -33,8 +35,8 @@ Code lives on GitHub; Cloudflare rebuilds and publishes the site on every push.
 | | **Client** | **Staff** | **Owner** |
 |---|---|---|---|
 | Login page | `/login` (client login) | `/team` → **Staff** | `/team` → **Owner** |
-| Sign up | `/register` — anyone | `/team/join` — needs the **staff code** | `/team/setup` — once, needs `SETUP_CODE` |
-| At every login | email + password | email + password + **staff code** | email + password |
+| Sign up | scan the QR, or name + phone | `/team/join` — needs the **staff code** | `/team/setup` — name + email + secret code (invite needed after the first owner) |
+| At every login | QR, or first name + phone | email + password + **staff code** | **secret code** only |
 | Can do | book, reschedule/cancel own bookings, **send feedback** | own schedule, confirm/done/no-show, move/cancel own bookings, time off, book walk-ins, read own reviews | everything: dashboard, all appointments, team, **staff code**, clients, feedback, services |
 
 **Staff code:** the owner sets it on **Owner → Team**. Staff need it to create an account *and* every time they log in.

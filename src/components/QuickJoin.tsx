@@ -36,8 +36,8 @@ export default function QuickJoin({ expired }: { expired?: boolean }) {
     <div className="container section" style={{ maxWidth: 520 }}>
       <div className="card" style={{ padding: 30 }}>
         <div className="eyebrow">Welcome to Maple &amp; Mane</div>
-        <h1 style={{ fontSize: "2rem" }}>You&apos;re one step away ✦</h1>
-        <p className="muted">No passwords. Just your name and phone — you&apos;ll stay signed in on this phone.</p>
+        <h1 style={{ fontSize: "2rem" }}>Log in or join ✦</h1>
+        <p className="muted">No passwords. Just your name and phone — new or returning. You&apos;ll stay signed in on this phone.</p>
         {error && <div className="alert alert-error" role="alert">{error}</div>}
         {returning ? (
           <div className="stack">
@@ -67,7 +67,7 @@ export default function QuickJoin({ expired }: { expired?: boolean }) {
             <div className="field">
               <label htmlFor="qj-email">Email <span className="muted">(optional)</span></label>
               <input id="qj-email" type="email" autoComplete="email" maxLength={120} value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
-              <div className="hint">Only for booking confirmations.</div>
+              <div className="hint">New clients only — for booking confirmations.</div>
             </div>
             <button className="btn btn-lg btn-block" disabled={busy}>{busy ? "One moment…" : "Continue"}</button>
           </form>

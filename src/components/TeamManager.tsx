@@ -61,7 +61,7 @@ function CoOwnersPanel() {
   return (
     <section className="card" style={{ marginBottom: 24 }}>
       <h2 style={{ fontSize: "1.4rem", marginBottom: 4 }}>Co-owners</h2>
-      <p className="muted small">Owners log in with email + password + their own owner code. To add another owner, invite their email first.</p>
+      <p className="muted small">Owners log in with their own secret code. To add another owner, invite their email first.</p>
       {msg && <div className={`alert alert-${msg.kind}`}>{msg.text}</div>}
       {data && (
         <div className="small" style={{ marginBottom: 12 }}>

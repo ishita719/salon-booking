@@ -51,8 +51,8 @@ export default async function OwnerDashboard() {
 
       {!me?.pinHash && (
         <div className="alert alert-gold spread" style={{ marginTop: 16 }}>
-          <span><strong>You&apos;re using the temporary owner code ({TEMP_OWNER_CODE}).</strong> Set your own private owner code now.</span>
-          <Link href="/settings" className="btn btn-sm btn-gold">Set my owner code</Link>
+          <span><strong>You&apos;re using the temporary secret code ({TEMP_OWNER_CODE}).</strong> It&apos;s short and easy to guess — set your own now.</span>
+          <Link href="/settings" className="btn btn-sm btn-gold">Set my secret code</Link>
         </div>
       )}
 

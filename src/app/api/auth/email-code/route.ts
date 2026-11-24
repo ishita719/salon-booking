@@ -26,7 +26,7 @@ export const POST = route(async (req) => {
 
   // OWNER_SIGNUP: allowed for the very first owner, or for an email an existing owner has invited.
   if (await db.query.users.findFirst({ where: eq(u.email, email), columns: { id: true } })) {
-    throw new ApiError(409, "That email already has an account. Log in instead (or use “Forgot owner code”).");
+    throw new ApiError(409, "That email already has an account. Log in instead (or use “Forgot secret code”).");
   }
   const ownerExists = !!(await db.query.users.findFirst({ where: eq(u.role, "OWNER"), columns: { id: true } }));
   if (ownerExists && !(await getOwnerInvites()).includes(email)) {

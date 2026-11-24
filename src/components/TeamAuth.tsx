@@ -14,11 +14,11 @@ function safeNext(): string | null {
 }
 
 const SIDE: Record<Mode, { title: string; text: string }> = {
-  login: { title: "Salon team", text: "One login for the owner and staff. Staff also enter the staff code from the owner every time they sign in." },
+  login: { title: "Salon team", text: "Owners: just your secret code. Staff: email, password and the team code from the owner — every time you sign in." },
   join: { title: "Join the team", text: "Create your staff account with the staff code the owner gave you. You'll land straight on your schedule." },
 };
 
-/** TEAM login (owner + owner code, or staff + team code) and staff sign-up (needs the team code). */
+/** TEAM login (owner: secret code only; staff: email + password + team code) and staff sign-up (needs the team code). */
 export default function TeamAuth({ mode }: { mode: Mode }) {
   const router = useRouter();
   const [as, setAs] = useState<"OWNER" | "STAFF">("STAFF");
@@ -51,9 +51,10 @@ export default function TeamAuth({ mode }: { mode: Mode }) {
     setError(null);
     setBusy(true);
     const f = Object.fromEntries(new FormData(e.currentTarget));
-    const url = mode === "login" ? "/api/auth/team-login" : "/api/auth/staff-join";
+    const ownerLogin = mode === "login" && as === "OWNER";
+    const url = ownerLogin ? "/api/auth/owner-login" : mode === "login" ? "/api/auth/team-login" : "/api/auth/staff-join";
     try {
-      const res = await api<{ home: string }>(url, { method: "POST", body: mode === "login" ? { ...f, as } : f });
+      const res = await api<{ home: string }>(url, { method: "POST", body: f });
       router.push(safeNext() ?? res.home);
       router.refresh();
     } catch (err) {
@@ -102,15 +103,19 @@ export default function TeamAuth({ mode }: { mode: Mode }) {
                 </div>
               </>
             )}
-            <div className="field">
-              <label htmlFor="email">Email</label>
-              <input id="email" name="email" type="email" required maxLength={120} autoComplete="email" />
-            </div>
-            <div className="field">
-              <label htmlFor="password">Password</label>
-              <input id="password" name="password" type="password" required minLength={mode === "login" ? 1 : 8} maxLength={100} autoComplete={mode === "login" ? "current-password" : "new-password"} />
-              {mode !== "login" && <div className="hint">At least 8 characters, with a letter and a number.</div>}
-            </div>
+            {!(mode === "login" && as === "OWNER") && (
+              <>
+                <div className="field">
+                  <label htmlFor="email">Email</label>
+                  <input id="email" name="email" type="email" required maxLength={120} autoComplete="email" />
+                </div>
+                <div className="field">
+                  <label htmlFor="password">Password</label>
+                  <input id="password" name="password" type="password" required minLength={mode === "login" ? 1 : 8} maxLength={100} autoComplete={mode === "login" ? "current-password" : "new-password"} />
+                  {mode !== "login" && <div className="hint">At least 8 characters, with a letter and a number.</div>}
+                </div>
+              </>
+            )}
             {(staffLogin || mode === "join") && (
               <div className="field">
                 <label htmlFor="staffCode">Staff code</label>
@@ -120,9 +125,9 @@ export default function TeamAuth({ mode }: { mode: Mode }) {
             )}
             {mode === "login" && as === "OWNER" && (
               <div className="field">
-                <label htmlFor="ownerCode">Owner code</label>
-                <input id="ownerCode" name="ownerCode" type="password" inputMode="numeric" className="code-input" required minLength={4} maxLength={8} autoComplete="off" placeholder="4–8 digits" />
-                <div className="hint">Your personal owner code (like a card PIN).</div>
+                <label htmlFor="ownerCode">Secret code</label>
+                <input id="ownerCode" name="code" type="password" className="code-input" required minLength={4} maxLength={64} autoComplete="current-password" autoFocus spellCheck={false} placeholder="Your owner secret code" />
+                <div className="hint">Owners log in with their secret code only.</div>
               </div>
             )}
             <button className="btn btn-block btn-lg" disabled={busy}>
@@ -139,7 +144,7 @@ export default function TeamAuth({ mode }: { mode: Mode }) {
           )}
           {mode === "login" && as === "OWNER" && (
             <>
-              <p className="small center" style={{ marginTop: 12 }}><Link href="/team/recover">Forgot owner code or password?</Link></p>
+              <p className="small center" style={{ marginTop: 12 }}><Link href="/team/recover">Forgot secret code?</Link></p>
               <div className="or-divider"><span>New owner?</span></div>
               <Link href="/team/setup" className="btn btn-outline btn-block">Create an owner account</Link>
               {setupNeeded && <div className="alert alert-gold small" style={{ marginTop: 12 }}>No owner account exists yet — create the first one.</div>}
