@@ -4,14 +4,15 @@ import postgres from "postgres";
 import { getEnv } from "@/lib/env";
 import * as schema from "./schema";
 
-// The database is Supabase (PostgreSQL). The server connects with DATABASE_URL — Supabase's connection pooler
-// ("Transaction pooler", port 6543). The browser never talks to the database directly.
+// The database is PostgreSQL. The server connects with DATABASE_URL: PostgreSQL on this PC while developing, and a
+// hosted PostgreSQL (e.g. Supabase's "Transaction pooler" or Neon) for the live site. The browser never talks to it.
 
 function connect(url: string) {
-  const local = /@(localhost|127\.0\.0\.1)[:/]/.test(url); // optional offline database (npm run db:offline)
+  const local = /@(localhost|127\.0\.0\.1)[:/]/.test(url); // PostgreSQL on this PC: no SSL needed
+  const singleConnection = /@(localhost|127\.0\.0\.1):5433\//.test(url); // the small offline test database (npm run db:offline)
   const client = postgres(url, {
     prepare: false, // required by Supabase's transaction pooler
-    max: local ? 1 : 5,
+    max: singleConnection ? 1 : 5,
     idle_timeout: 20,
     connect_timeout: 10,
     ssl: local ? false : "require",

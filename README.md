@@ -1,7 +1,7 @@
 # Maple & Mane Studio — Salon Booking Website
 
 Appointment booking for a Vancouver salon that works **in the studio and at clients' homes**.
-**Stack:** Next.js 15 (React 19, TypeScript) · Cloudflare Workers (via OpenNext) · **Supabase (PostgreSQL) database** · Drizzle ORM.
+**Stack:** Next.js 15 (React 19, TypeScript) · Cloudflare Workers (via OpenNext) · **PostgreSQL database** (on your PC for development; Supabase or Neon when live) · Drizzle ORM.
 Code lives on GitHub; Cloudflare rebuilds and publishes the site on every push.
 
 ---
@@ -73,7 +73,7 @@ cd salon-booking
 npm install
 ```
 
-Create your local secrets (first time only): copy `.env.example` to **both** `.env` and `.dev.vars`, then fill in `AUTH_SECRET`, `SETUP_CODE` and `DATABASE_URL` (your Supabase connection string — see **Supabase database** below).
+Create your local secrets (first time only): copy `.env.example` to **both** `.env` and `.dev.vars`, then fill in `AUTH_SECRET`, `SETUP_CODE` and `DATABASE_URL` (see **PostgreSQL on your PC** below).
 
 ```bash
 copy .env.example .env
@@ -83,7 +83,23 @@ copy .env.example .env
 copy .env.example .dev.vars
 ```
 
-Create the tables and starter services/team/products/offers in your Supabase database (safe to run again):
+### PostgreSQL on your PC
+Install PostgreSQL 17 (it runs as the Windows service `postgresql-x64-17` and starts with Windows):
+
+```powershell
+winget install --id PostgreSQL.PostgreSQL.17 -e
+```
+
+Create a database and a user for the website (in **SQL Shell (psql)** as `postgres`), choosing your own password:
+
+```sql
+CREATE ROLE salon_app LOGIN PASSWORD 'choose-a-password';
+CREATE DATABASE salon OWNER salon_app;
+```
+
+Then in `.env` and `.dev.vars`: `DATABASE_URL="postgresql://salon_app:choose-a-password@localhost:5432/salon"`.
+
+Create the tables and starter services/team/products/offers (safe to run again):
 
 ```bash
 npm run db:setup
@@ -109,7 +125,7 @@ Open http://localhost:3000, go to **/team/setup** and create the owner account w
 
 ---
 
-## Supabase database
+## Supabase database (for the live site — optional for now)
 
 The website's data (clients, bookings, team, services, offers, feedback, payments, settings) lives in **Supabase**,
 which runs a PostgreSQL database for you. Only the website's **server** talks to it, using `DATABASE_URL`:
