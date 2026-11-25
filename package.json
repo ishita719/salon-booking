@@ -8,25 +8,27 @@
     "build": "next build",
     "lint": "tsc --noEmit",
     "test": "tsx --test tests/*.test.ts",
-    "db:migrate:local": "node scripts/local-db.mjs migrate",
-    "db:migrate:remote": "wrangler d1 migrations apply salon-db --remote",
-    "setup": "node scripts/local-db.mjs migrate",
     "preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
-    "deploy": "wrangler d1 migrations apply salon-db --remote && opennextjs-cloudflare build && opennextjs-cloudflare deploy",
+    "deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
     "cf-typegen": "wrangler types --env-interface CloudflareEnv cloudflare-env.d.ts",
-    "db:sql:local": "node scripts/local-db.mjs sql"
+    "db:setup": "node --env-file-if-exists=.env scripts/db-setup.mjs",
+    "db:offline": "node scripts/db-offline.mjs",
+    "db:copy-local": "node --env-file-if-exists=.env scripts/copy-local-d1.mjs"
   },
   "dependencies": {
     "@opennextjs/cloudflare": "^1.20.17",
     "drizzle-orm": "^0.45.4",
     "jose": "^5.9.6",
     "next": "^15.5.29",
+    "postgres": "^3.4.9",
     "qrcode-generator": "^2.0.4",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "zod": "^3.25.0"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.6.0",
+    "@electric-sql/pglite-socket": "^0.3.0",
     "@types/node": "^22.10.0",
     "@types/react": "^19.1.0",
     "@types/react-dom": "^19.1.0",

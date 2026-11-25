@@ -1,57 +1,57 @@
-// Database tables (Cloudflare D1 = SQLite). Keep in sync with the SQL files in /migrations.
+// Database tables (Supabase = PostgreSQL). Keep in sync with the SQL files in /supabase/migrations.
 
-import { index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
+import { boolean, index, integer, pgTable, serial, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
 
 const id = () => text("id").primaryKey().$defaultFn(() => crypto.randomUUID());
-const createdAt = () => integer("created_at", { mode: "timestamp_ms" }).notNull().$defaultFn(() => new Date());
+const createdAt = () => timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().$defaultFn(() => new Date());
 const updatedAt = () =>
-  integer("updated_at", { mode: "timestamp_ms" })
+  timestamp("updated_at", { withTimezone: true, mode: "date" })
     .notNull()
     .$defaultFn(() => new Date())
     .$onUpdateFn(() => new Date());
 
 // Everyone who can log in: clients, staff and the owner.
-export const users = sqliteTable("users", {
+export const users = pgTable("users", {
   id: id(),
   name: text("name").notNull(),
   email: text("email").notNull().unique(),
   phone: text("phone").notNull(),
   passwordHash: text("password_hash").notNull(),
   role: text("role").notNull().default("CUSTOMER"), // CUSTOMER | STAFF | OWNER
-  active: integer("active", { mode: "boolean" }).notNull().default(true),
+  active: boolean("active").notNull().default(true),
   pinHash: text("pin_hash"), // owner code (hashed); null = temporary code
   phoneDigits: text("phone_digits").notNull().default(""), // phone as digits only, for QR sign-in matching
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 });
 
-export const services = sqliteTable("services", {
+export const services = pgTable("services", {
   id: id(),
   name: text("name").notNull(),
   category: text("category").notNull(),
   description: text("description").notNull().default(""),
   durationMin: integer("duration_min").notNull(),
   priceCents: integer("price_cents").notNull(),
-  homeAvailable: integer("home_available", { mode: "boolean" }).notNull().default(true),
-  active: integer("active", { mode: "boolean" }).notNull().default(true),
+  homeAvailable: boolean("home_available").notNull().default(true),
+  active: boolean("active").notNull().default(true),
   targets: text("targets").notNull().default(""), // comma list of skin/hair needs it helps (see lib/skin.ts)
   steps: text("steps").notNull().default(""), // "how it's done", one step per line
   createdAt: createdAt(),
 });
 
 // A bookable team member, linked to a STAFF login through userId.
-export const stylists = sqliteTable("stylists", {
+export const stylists = pgTable("stylists", {
   id: id(),
   name: text("name").notNull(),
   title: text("title").notNull(),
   bio: text("bio").notNull().default(""),
-  active: integer("active", { mode: "boolean" }).notNull().default(true),
+  active: boolean("active").notNull().default(true),
   workDays: text("work_days").notNull().default("0,2,3,4,5,6"), // weekdays worked, 0 = Sunday
   userId: text("user_id").unique().references(() => users.id, { onDelete: "set null" }),
 });
 
 // Staff unavailability (vacation, appointment, sick day). Blocks booking.
-export const timeOff = sqliteTable(
+export const timeOff = pgTable(
   "time_off",
   {
     id: id(),
@@ -65,7 +65,7 @@ export const timeOff = sqliteTable(
   (t) => [index("time_off_date_idx").on(t.date)],
 );
 
-export const appointments = sqliteTable(
+export const appointments = pgTable(
   "appointments",
   {
     id: id(),
@@ -86,16 +86,16 @@ export const appointments = sqliteTable(
     notes: text("notes"),
     subtotalCents: integer("subtotal_cents").notNull().default(0),
     travelFeeCents: integer("travel_fee_cents").notNull().default(0),
-    hasCustom: integer("has_custom", { mode: "boolean" }).notNull().default(false),
+    hasCustom: boolean("has_custom").notNull().default(false),
     rescheduleCount: integer("reschedule_count").notNull().default(0),
-    cancelledAt: integer("cancelled_at", { mode: "timestamp_ms" }),
+    cancelledAt: timestamp("cancelled_at", { withTimezone: true, mode: "date" }),
     discountCents: integer("discount_cents").notNull().default(0),
     offerId: text("offer_id"),
     offerTitle: text("offer_title"),
     paymentStatus: text("payment_status").notNull().default("UNPAID"), // UNPAID | PENDING | PAID_ONLINE | PAID_IN_SALON | REFUNDED
     paidCents: integer("paid_cents").notNull().default(0),
     stripeSessionId: text("stripe_session_id"),
-    paidAt: integer("paid_at", { mode: "timestamp_ms" }),
+    paidAt: timestamp("paid_at", { withTimezone: true, mode: "date" }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -107,7 +107,7 @@ export const appointments = sqliteTable(
 );
 
 // One line per service on an appointment; name/price copied at booking time. serviceId null = custom service.
-export const appointmentItems = sqliteTable(
+export const appointmentItems = pgTable(
   "appointment_items",
   {
     id: id(),
@@ -116,13 +116,13 @@ export const appointmentItems = sqliteTable(
     name: text("name").notNull(),
     durationMin: integer("duration_min").notNull(),
     priceCents: integer("price_cents"), // null = custom service, priced at the visit
-    isCustom: integer("is_custom", { mode: "boolean" }).notNull().default(false),
+    isCustom: boolean("is_custom").notNull().default(false),
   },
   (t) => [index("appointment_items_appt_idx").on(t.appointmentId)],
 );
 
 // Client reviews. One per appointment (or general feedback without an appointment).
-export const feedback = sqliteTable(
+export const feedback = pgTable(
   "feedback",
   {
     id: id(),
@@ -131,7 +131,7 @@ export const feedback = sqliteTable(
     stylistId: text("stylist_id").references(() => stylists.id, { onDelete: "set null" }),
     rating: integer("rating").notNull(), // 1–5
     comment: text("comment").notNull().default(""),
-    isPublic: integer("is_public", { mode: "boolean" }).notNull().default(false), // owner chooses to show it on the home page
+    isPublic: boolean("is_public").notNull().default(false), // owner chooses to show it on the home page
     ownerReply: text("owner_reply"),
     createdAt: createdAt(),
   },
@@ -139,7 +139,7 @@ export const feedback = sqliteTable(
 );
 
 // Retail products recommended after the skin check.
-export const products = sqliteTable("products", {
+export const products = pgTable("products", {
   id: id(),
   name: text("name").notNull(),
   brand: text("brand").notNull().default(""),
@@ -148,12 +148,12 @@ export const products = sqliteTable("products", {
   howToUse: text("how_to_use").notNull().default(""),
   priceCents: integer("price_cents").notNull(),
   targets: text("targets").notNull().default(""),
-  active: integer("active", { mode: "boolean" }).notNull().default(true),
+  active: boolean("active").notNull().default(true),
   createdAt: createdAt(),
 });
 
 // Discounts the owner runs. Applied automatically at booking (best single offer wins).
-export const offers = sqliteTable("offers", {
+export const offers = pgTable("offers", {
   id: id(),
   title: text("title").notNull(),
   description: text("description").notNull().default(""),
@@ -161,15 +161,15 @@ export const offers = sqliteTable("offers", {
   value: integer("value").notNull(), // percent, or cents for AMOUNT
   serviceIds: text("service_ids").notNull().default(""),
   categories: text("categories").notNull().default(""),
-  firstVisitOnly: integer("first_visit_only", { mode: "boolean" }).notNull().default(false),
+  firstVisitOnly: boolean("first_visit_only").notNull().default(false),
   startsOn: text("starts_on"),
   endsOn: text("ends_on"),
-  active: integer("active", { mode: "boolean" }).notNull().default(true),
+  active: boolean("active").notNull().default(true),
   createdAt: createdAt(),
 });
 
 // Result of the client's online skin & hair check.
-export const skinProfiles = sqliteTable("skin_profiles", {
+export const skinProfiles = pgTable("skin_profiles", {
   userId: text("user_id").primaryKey().references(() => users.id, { onDelete: "cascade" }),
   answers: text("answers").notNull(), // JSON
   skinType: text("skin_type").notNull(),
@@ -181,7 +181,7 @@ export const skinProfiles = sqliteTable("skin_profiles", {
 });
 
 // "Our work" photos.
-export const gallery = sqliteTable("gallery", {
+export const gallery = pgTable("gallery", {
   id: id(),
   title: text("title").notNull(),
   category: text("category").notNull(),
@@ -193,10 +193,10 @@ export const gallery = sqliteTable("gallery", {
 });
 
 // Anonymous page views for the owner's visitor stats (random visitor id, no personal data).
-export const pageViews = sqliteTable(
+export const pageViews = pgTable(
   "page_views",
   {
-    id: integer("id").primaryKey({ autoIncrement: true }),
+    id: serial("id").primaryKey(),
     date: text("date").notNull(),
     path: text("path").notNull(),
     visitor: text("visitor").notNull(),
@@ -206,32 +206,32 @@ export const pageViews = sqliteTable(
 );
 
 // 6-digit codes sent by email (owner sign-up / forgot code, client login). Stored hashed, 10-minute life, 5 tries.
-export const verificationCodes = sqliteTable(
+export const verificationCodes = pgTable(
   "verification_codes",
   {
     id: id(),
     email: text("email").notNull(),
     purpose: text("purpose").notNull(), // OWNER_SIGNUP | OWNER_RESET | CLIENT_LOGIN
     codeHash: text("code_hash").notNull(),
-    expiresAt: integer("expires_at", { mode: "timestamp_ms" }).notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true, mode: "date" }).notNull(),
     attempts: integer("attempts").notNull().default(0),
-    used: integer("used", { mode: "boolean" }).notNull().default(false),
+    used: boolean("used").notNull().default(false),
     createdAt: createdAt(),
   },
   (t) => [index("verification_codes_email_idx").on(t.email, t.purpose)],
 );
 
 // One-time "scan to log in" QR codes for clients (10 minutes, single use). Token stored hashed.
-export const loginTokens = sqliteTable("login_tokens", {
+export const loginTokens = pgTable("login_tokens", {
   tokenHash: text("token_hash").primaryKey(),
   userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  expiresAt: integer("expires_at", { mode: "timestamp_ms" }).notNull(),
-  usedAt: integer("used_at", { mode: "timestamp_ms" }),
+  expiresAt: timestamp("expires_at", { withTimezone: true, mode: "date" }).notNull(),
+  usedAt: timestamp("used_at", { withTimezone: true, mode: "date" }),
   createdAt: createdAt(),
 });
 
 // Small key/value store for salon settings (e.g. the staff access code).
-export const settings = sqliteTable("settings", {
+export const settings = pgTable("settings", {
   key: text("key").primaryKey(),
   value: text("value").notNull(),
   updatedAt: updatedAt(),

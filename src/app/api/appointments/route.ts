@@ -104,9 +104,9 @@ export const POST = route(async (req) => {
 
   const id = crypto.randomUUID();
   const now = new Date();
-  // Appointment + its line items are written together in one atomic batch.
-  await db.batch([
-    db.insert(appointments).values({
+  // Appointment + its line items are written together in one transaction (all or nothing).
+  await db.transaction(async (tx) => {
+    await tx.insert(appointments).values({
       id,
       userId: forWho.userId,
       guestName: forWho.guestName ?? null,
@@ -129,9 +129,9 @@ export const POST = route(async (req) => {
       offerTitle: offer?.offer.title ?? null,
       createdAt: now,
       updatedAt: now,
-    }),
-    db.insert(appointmentItems).values(priced.items.map((i) => ({ ...i, appointmentId: id }))),
-  ]);
+    });
+    await tx.insert(appointmentItems).values(priced.items.map((i) => ({ ...i, appointmentId: id })));
+  });
 
   // Two people may have picked the same slot at the same moment: the first one saved keeps it.
   if (await lostRace(db, { id, stylistId, date: data.date, startMin: data.startMin, endMin: data.startMin + priced.durationMin, locationType: data.locationType, createdAt: now })) {

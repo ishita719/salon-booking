@@ -1,7 +1,7 @@
 # Maple & Mane Studio — Salon Booking Website
 
 Appointment booking for a Vancouver salon that works **in the studio and at clients' homes**.
-**Stack:** Next.js 15 (React 19, TypeScript) · Cloudflare Workers (via OpenNext) · Cloudflare D1 database · Drizzle ORM.
+**Stack:** Next.js 15 (React 19, TypeScript) · Cloudflare Workers (via OpenNext) · **Supabase (PostgreSQL) database** · Drizzle ORM.
 Code lives on GitHub; Cloudflare rebuilds and publishes the site on every push.
 
 ---
@@ -73,7 +73,7 @@ cd salon-booking
 npm install
 ```
 
-Create your local secrets (first time only): copy `.env.example` to **both** `.env` and `.dev.vars`, then fill in `AUTH_SECRET` and `SETUP_CODE`.
+Create your local secrets (first time only): copy `.env.example` to **both** `.env` and `.dev.vars`, then fill in `AUTH_SECRET`, `SETUP_CODE` and `DATABASE_URL` (your Supabase connection string — see **Supabase database** below).
 
 ```bash
 copy .env.example .env
@@ -83,10 +83,10 @@ copy .env.example .env
 copy .env.example .dev.vars
 ```
 
-Create the local database (tables + starter services/team). Data is stored in `%USERPROFILE%\.salon-booking-dev`:
+Create the tables and starter services/team/products/offers in your Supabase database (safe to run again):
 
 ```bash
-npm run setup
+npm run db:setup
 ```
 
 Start the site:
@@ -99,20 +99,41 @@ Open http://localhost:3000, go to **/team/setup** and create the owner account w
 
 | Command | What it does |
 |---|---|
-| `npm run dev` | Local site with hot reload (uses the local D1 database) |
+| `npm run dev` | Local site with hot reload (uses the database in `DATABASE_URL`) |
 | `npm run preview` | Builds for Cloudflare and runs it in Cloudflare's real runtime locally |
 | `npm test` | Time-slot / availability tests |
 | `npm run lint` | Type-checks the project |
-| `npm run db:migrate:local` | Applies new SQL files in `migrations/` to the local database |
-| `npm run db:sql:local "SELECT * FROM users"` | Run SQL on the local database |
+| `npm run db:setup` | Creates/updates the tables (`supabase/migrations`) and adds the starter data (`supabase/seed.sql`) |
+| `npm run db:offline` | Optional: a PostgreSQL database on your own PC for testing without internet (`localhost:5433`) |
+| `npm run db:copy-local` | Optional: copies the old local test data (from before Supabase) into `DATABASE_URL` |
+
+---
+
+## Supabase database
+
+The website's data (clients, bookings, team, services, offers, feedback, payments, settings) lives in **Supabase**,
+which runs a PostgreSQL database for you. Only the website's **server** talks to it, using `DATABASE_URL`:
+the browser never connects to the database, and the Supabase API keys are **not** used.
+
+1. Sign up at **supabase.com** → **New project** → name `salon-booking`, region **West US (North California)**
+   (closest to Vancouver) → choose a strong **database password** and save it in your password manager.
+2. In the project, click **Connect** → **Transaction pooler** → copy the URI. It looks like
+   `postgresql://postgres.<project-ref>:[YOUR-PASSWORD]@aws-0-us-west-1.pooler.supabase.com:6543/postgres`.
+   Replace `[YOUR-PASSWORD]` with your database password.
+3. Put it in `.env` **and** `.dev.vars` as `DATABASE_URL="…"`, then run `npm run db:setup`.
+4. Check it in Supabase → **Table Editor**: you'll see the tables and the starter services.
+
+Security: every table has **Row Level Security switched on with no policies**, and the public `anon`/`authenticated`
+roles have no access — so Supabase's public API can't read or change anything, even if someone finds the project URL.
+Keep `DATABASE_URL` secret (it contains the database password).
 
 ---
 
 ## Deploy on Cloudflare (connected to GitHub)
 
-### 1. Create the database
-Cloudflare dashboard → **Storage & Databases → D1 → Create database** → name it **`salon-db`** (location: Western North America).
-Copy its **Database ID** and put it in `wrangler.jsonc` → `d1_databases[0].database_id`, then commit and push.
+### 1. Set up the database
+Do the **Supabase database** steps above (once). New tables or columns go in a new file in `supabase/migrations/`;
+run `npm run db:setup` before deploying a change that needs them.
 
 ### 2. Connect the GitHub repo
 **Workers & Pages → Create → Import a repository** → connect GitHub → pick **salon-booking**. Settings:
@@ -121,16 +142,17 @@ Copy its **Database ID** and put it in `wrangler.jsonc` → `d1_databases[0].dat
 |---|---|
 | Project name | `salon-booking` (must match `name` in `wrangler.jsonc`) |
 | Build command | `npx opennextjs-cloudflare build` |
-| Deploy command | `npx wrangler d1 migrations apply salon-db --remote && npx opennextjs-cloudflare deploy` |
+| Deploy command | `npx opennextjs-cloudflare deploy` |
 | Root directory | `/` |
 
-Click **Deploy**. Every push to `main` now rebuilds and publishes automatically, and new database migrations are applied first.
+Click **Deploy**. Every push to `main` now rebuilds and publishes automatically.
 
 ### 3. Add the secrets
 **salon-booking → Settings → Variables and Secrets** → add as type **Secret**:
 
 | Name | Value |
 |---|---|
+| `DATABASE_URL` | your Supabase **Transaction pooler** connection string (with the password filled in) |
 | `AUTH_SECRET` | long random string (48+ characters) |
 | `SETUP_CODE` | private one-time code for creating the owner account |
 | `STRIPE_SECRET_KEY` | optional — Stripe secret key (start with `sk_test_…`) to accept online payments |
@@ -158,14 +180,17 @@ Then **Deployments → Retry/Redeploy** so the secrets are picked up.
 - CSRF protection (origin check + SameSite cookies), no open redirects, security headers (CSP, HSTS, X-Frame-Options…)
 - Double-booking guard: after saving, the booking is re-checked; if two people grabbed the same slot, the later one is asked to pick again
 - Secrets only in Cloudflare secrets / local `.env` + `.dev.vars` (all git-ignored)
+- Database: Supabase tables have Row Level Security on with no policies, so only the website's server can read or write them
 
 ---
 
 ## Project structure
 
 ```
-migrations/            SQL for the D1 database (0001 tables, 0002 starter menu & team)
-wrangler.jsonc         Cloudflare Worker + D1 configuration
+supabase/migrations/   SQL for the Supabase (PostgreSQL) tables
+supabase/seed.sql      starter menu, team, products, offers, gallery
+scripts/               db-setup (create tables), db-offline (optional local PostgreSQL), copy-local-d1
+wrangler.jsonc         Cloudflare Worker configuration
 open-next.config.ts    Next.js → Cloudflare adapter
 src/
   db/schema.ts         tables (users, services, stylists, time_off, appointments, appointment_items, feedback, settings)

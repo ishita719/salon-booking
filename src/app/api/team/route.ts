@@ -51,11 +51,12 @@ export const POST = route(async (req) => {
   if (await db.query.users.findFirst({ where: eq(users.email, data.email), columns: { id: true } })) {
     throw new ApiError(409, "That email is already used by another account.");
   }
+  const passwordHash = await hashPassword(data.password);
   const userId = crypto.randomUUID();
   const stylistId = crypto.randomUUID();
-  await db.batch([
-    db.insert(users).values({ id: userId, name: data.name, email: data.email, phone: data.phone, phoneDigits: phoneDigits(data.phone), role: "STAFF", passwordHash: await hashPassword(data.password) }),
-    db.insert(stylists).values({ id: stylistId, name: data.name, title: data.title, bio: data.bio, workDays: data.workDays, userId }),
-  ]);
+  await db.transaction(async (tx) => {
+    await tx.insert(users).values({ id: userId, name: data.name, email: data.email, phone: data.phone, phoneDigits: phoneDigits(data.phone), role: "STAFF", passwordHash });
+    await tx.insert(stylists).values({ id: stylistId, name: data.name, title: data.title, bio: data.bio, workDays: data.workDays, userId });
+  });
   return NextResponse.json({ id: stylistId }, { status: 201 });
 });

@@ -10,14 +10,7 @@
     "directory": ".open-next/assets",
     "binding": "ASSETS"
   },
-  "d1_databases": [
-    {
-      "binding": "DB",
-      "database_name": "salon-db",
-      // Replace with the ID shown in Cloudflare → Storage & Databases → D1 → salon-db
-      "database_id": "00000000-0000-0000-0000-000000000000",
-      "migrations_dir": "migrations"
-    }
-  ],
+  // The database is Supabase (PostgreSQL). Its connection string is the secret DATABASE_URL
+  // (Cloudflare → Workers & Pages → salon-booking → Settings → Variables and Secrets).
   "observability": { "enabled": true }
 }
