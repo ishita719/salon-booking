@@ -68,7 +68,7 @@ export default async function InsightsPage({ searchParams }: { searchParams: Pro
         ))}
       </div>
 
-      <div className="dash-cols" style={{ marginTop: 24, gridTemplateColumns: "1fr 1fr" }}>
+      <div className="visit-cols" style={{ marginTop: 24 }}>
         <section className="card">
           <h3>Visitors per day</h3>
           <div className="bars" aria-label="Visitors per day">

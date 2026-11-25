@@ -110,7 +110,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               </div>
             </div>
             <div className="footer-bottom spread">
-              <span>© {new Date().getFullYear()} {SALON.name} · Vancouver, BC</span>
+              <span>© {new Date().getFullYear()} {SALON.name} · Vancouver, BC <span className="photo-credit">· Photos: Unsplash</span></span>
               {user && <span>Signed in as {user.name} ({ROLE_LABEL[user.role]})</span>}
             </div>
           </div>

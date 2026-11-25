@@ -1,6 +1,6 @@
 import { asc, eq } from "drizzle-orm";
 import Link from "next/link";
-import { CategoryIcon, HeroArt } from "@/components/Icons";
+import { CategoryIcon } from "@/components/Icons";
 import Stars from "@/components/Stars";
 import { getDb, schema } from "@/db";
 import { BOOKING_RULES, HOME_VISITS, HOURS, SALON } from "@/lib/config";
@@ -8,6 +8,7 @@ import GalleryGrid from "@/components/GalleryGrid";
 import { galleryItems } from "@/lib/content";
 import { publicReviews } from "@/lib/feedback";
 import { liveOffers } from "@/lib/offers";
+import { categoryPhoto, PHOTOS } from "@/lib/photos";
 import { formatMoney, formatTime, salonNow, weekdayOf } from "@/lib/time";
 
 export const dynamic = "force-dynamic";
@@ -56,7 +57,10 @@ export default async function Home() {
           </div>
           <div className="hero-art">
             <div className="ring" />
-            <div className="orb"><HeroArt /></div>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img className="hero-photo" src={PHOTOS.heroMain.src} alt={PHOTOS.heroMain.alt} fetchPriority="high" />
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img className="hero-photo-sm" src={PHOTOS.heroSide.src} alt={PHOTOS.heroSide.alt} loading="lazy" />
             <div className="float-card fc-1"><span className="ic">✂</span><div><strong>Online booking</strong><span className="muted">24/7, real-time slots</span></div></div>
             <div className="float-card fc-2"><span className="ic">⌂</span><div><strong>We come to you</strong><span className="muted">+{formatMoney(HOME_VISITS.travelFeeCents)} travel</span></div></div>
             <div className="float-card fc-3"><span className="ic" style={{ color: "var(--gold)" }}>★</span><div><strong>{avg ? avg.toFixed(1) : "5.0"} rating</strong><span className="muted">from happy clients</span></div></div>
@@ -74,10 +78,14 @@ export default async function Home() {
             </div>
             <Link href="/services" className="btn btn-ghost">View full price list →</Link>
           </div>
-          <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))" }}>
+          <div className="grid cat-grid">
             {categories.map((c) => (
               <Link key={c.cat} href={`/services#${encodeURIComponent(c.cat)}`} className="cat-card">
-                <span className="cat-icon"><CategoryIcon category={c.cat} /></span>
+                <span className="cat-photo">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={categoryPhoto(c.cat, 640).src} alt={categoryPhoto(c.cat).alt} loading="lazy" />
+                  <span className="cat-icon"><CategoryIcon category={c.cat} /></span>
+                </span>
                 <h3 style={{ margin: 0 }}>{c.cat}</h3>
                 <span className="small muted">{c.names.join(" · ")}</span>
                 <span className="from">From <strong style={{ color: "var(--text)" }}>{formatMoney(c.from)}</strong> · {c.count} service{c.count > 1 ? "s" : ""}</span>
@@ -107,22 +115,26 @@ export default async function Home() {
         <div className="container feature-band">
           <div>
             <div className="eyebrow">New · Free for members</div>
-            <h2>Not sure what your skin needs? Check it online first.</h2>
-            <p className="lead">Answer 9 quick questions about your skin and hair. We&apos;ll show your skin profile, the treatments that suit you, the products to use at home — and the offers that apply.</p>
+            <h2>Not sure what your skin needs? Scan it with your camera.</h2>
+            <p className="lead">Scan your face, hair and hands with your phone (or answer a few quick questions). We&apos;ll show your skin profile, the treatments that suit you, the products to use at home — and the offers that apply.</p>
             <ul style={{ paddingLeft: 18, color: "var(--muted)" }}>
+              <li>📷 Camera scan for skin, hair &amp; nails — photos never leave your phone</li>
               <li>Personal morning &amp; evening routine</li>
               <li>Treatments matched to your skin type and concerns</li>
               <li>Product picks with how to use them</li>
               <li>Member prices on recommended services</li>
             </ul>
             <div className="row" style={{ marginTop: 16 }}>
-              <Link href="/account/skin-check" className="btn btn-lg">Start my skin check</Link>
-              <Link href="/welcome" className="btn btn-outline btn-lg">Join with name &amp; phone</Link>
+              <Link href="/account/skin-check" className="btn btn-lg">📷 Start my skin scan</Link>
+              <Link href="/welcome?next=/account/skin-check" className="btn btn-outline btn-lg">Join with name &amp; phone</Link>
             </div>
           </div>
+          <div className="skin-visual">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img className="skin-photo" src={PHOTOS.skincare.src} alt={PHOTOS.skincare.alt} loading="lazy" />
           <div className="mock-quiz" aria-hidden>
-            <div className="small muted">Question 1 of 9</div>
-            <div className="progress"><span style={{ width: "11%" }} /></div>
+            <div className="small muted">📷 Scan result · Question 1 of 10</div>
+            <div className="progress"><span style={{ width: "10%" }} /></div>
             <h3>By midday, how does your skin feel?</h3>
             <div className="opt-grid" style={{ gridTemplateColumns: "1fr 1fr" }}>
               <div className="opt"><strong>Shiny all over</strong><span>I often blot</span></div>
@@ -132,13 +144,14 @@ export default async function Home() {
             </div>
             <div className="alert alert-gold small" style={{ marginTop: 14, marginBottom: 0 }}>✦ Result: Combination skin · Hydra-Glow Facial recommended</div>
           </div>
+          </div>
         </div>
       </section>
 
       {/* ---------- At-home band ---------- */}
       <section className="section">
         <div className="container">
-          <div className="band">
+          <div className="band band-photo" style={{ backgroundImage: `linear-gradient(110deg, rgba(42,23,36,0.94) 0%, rgba(92,42,74,0.86) 55%, rgba(92,42,74,0.55) 100%), url(${PHOTOS.salon.src})` }}>
             <div className="band-grid">
               <div>
                 <div className="eyebrow" style={{ color: "#f3d9a8" }}>Salon at your door</div>
@@ -239,7 +252,7 @@ export default async function Home() {
 
       {/* ---------- Visit ---------- */}
       <section className="section">
-        <div className="container dash-cols" style={{ gridTemplateColumns: "1fr 1fr" }}>
+        <div className="container visit-cols">
           <div className="card">
             <div className="eyebrow">Opening hours</div>
             <table className="hours-table">
@@ -262,7 +275,7 @@ export default async function Home() {
             </div>
             <div className="row">
               <Link href="/book" className="btn">Book now</Link>
-              <Link href="/welcome" className="btn btn-outline">Join in 30 seconds</Link>
+              <Link href="/welcome?next=/book" className="btn btn-outline">Join in 30 seconds</Link>
             </div>
           </div>
         </div>

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { CategoryIcon } from "@/components/Icons";
 import { getDb, schema } from "@/db";
 import { BOOKING_RULES } from "@/lib/config";
+import { categoryPhoto } from "@/lib/photos";
 import { formatDuration, formatMoney } from "@/lib/time";
 
 export const metadata: Metadata = { title: "Services & prices" };
@@ -32,9 +33,14 @@ export default async function ServicesPage() {
       <div className="container" style={{ paddingBottom: 40 }}>
         {categories.map((cat) => (
           <section key={cat} id={encodeURIComponent(cat)} style={{ paddingTop: 36, scrollMarginTop: 90 }}>
-            <div className="row" style={{ marginBottom: 16 }}>
+            <div className="cat-banner" style={{ backgroundImage: `linear-gradient(90deg, rgba(42,23,36,0.82) 0%, rgba(92,42,74,0.45) 55%, rgba(92,42,74,0.05) 100%), url(${categoryPhoto(cat, 1400).src})` }}>
               <span className="cat-icon"><CategoryIcon category={cat} /></span>
-              <h2 style={{ margin: 0 }}>{cat}</h2>
+              <div>
+                <h2 style={{ margin: 0, color: "#fff" }}>{cat}</h2>
+                <span className="small" style={{ color: "rgba(255,255,255,0.85)" }}>
+                  {services.filter((s) => s.category === cat).length} service{services.filter((s) => s.category === cat).length > 1 ? "s" : ""}
+                </span>
+              </div>
             </div>
             <div className="grid">
               {services.filter((s) => s.category === cat).map((s) => (
