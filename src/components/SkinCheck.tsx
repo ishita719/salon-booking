@@ -3,23 +3,37 @@
 import Link from "next/link";
 import { useState } from "react";
 import { api } from "@/lib/client";
+import ScanStudio from "@/components/ScanStudio";
 import type { Recommendations } from "@/lib/recommend";
+import type { ScanResult, SuggestedAnswers } from "@/lib/scan";
 import { QUESTIONS, SkinAnswers } from "@/lib/skin";
 
 type Draft = Partial<Record<keyof SkinAnswers, string | string[]>>;
 
-/** The online skin & hair check: a short quiz, then a personal profile with matched treatments, products and offers. */
+/** The online skin, hair & nails check: optional camera scan → short quiz (pre-filled by the scan) → personal profile with matched treatments, products and offers. */
 export default function SkinCheck({ initial }: { initial: Recommendations }) {
   const [data, setData] = useState<Recommendations>(initial);
-  const [mode, setMode] = useState<"intro" | "quiz" | "result">(initial.hasProfile ? "result" : "intro");
+  const [mode, setMode] = useState<"intro" | "scan" | "quiz" | "result">(initial.hasProfile ? "result" : "intro");
   const [step, setStep] = useState(0);
   const [draft, setDraft] = useState<Draft>((initial.answers as Draft) ?? {});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [suggested, setSuggested] = useState<SuggestedAnswers>({});
+  const [scans, setScans] = useState<ScanResult[]>([]);
 
   const q = QUESTIONS[step];
   const value = draft[q.id];
-  const answered = q.multi ? Array.isArray(value) && (value.length > 0 || q.id === "hairConcerns") : typeof value === "string";
+  const answered = q.multi ? (Array.isArray(value) && value.length > 0) || !!q.optional : typeof value === "string";
+  const top = () => window.scrollTo({ top: 0 });
+
+  function fromScan(s: SuggestedAnswers, results: ScanResult[]) {
+    setSuggested(s);
+    setScans(results);
+    setDraft((d) => ({ ...d, ...s }));
+    setStep(0);
+    setMode("quiz");
+    top();
+  }
 
   function pick(v: string) {
     if (q.multi) {
@@ -36,7 +50,7 @@ export default function SkinCheck({ initial }: { initial: Recommendations }) {
     setBusy(true);
     setError(null);
     try {
-      const answers = { ...draft, hairConcerns: draft.hairConcerns ?? [] };
+      const answers = { ...draft, hairConcerns: draft.hairConcerns ?? [], nailConcerns: draft.nailConcerns ?? [] };
       setData(await api<Recommendations>("/api/skin-check", { method: "POST", body: { answers } }));
       setMode("result");
       window.scrollTo({ top: 0, behavior: "smooth" });
@@ -50,18 +64,23 @@ export default function SkinCheck({ initial }: { initial: Recommendations }) {
   if (mode === "intro")
     return (
       <div className="quiz card" style={{ padding: 36 }}>
-        <div className="eyebrow">Free online skin &amp; hair check</div>
+        <div className="eyebrow">Free skin, hair &amp; nails check</div>
         <h1 style={{ fontSize: "2.2rem" }}>Let&apos;s get to know your skin</h1>
-        <p className="lead">9 quick questions, about 2 minutes. You&apos;ll get your skin profile, a simple routine, the treatments that suit you best, product picks and your member offers.</p>
+        <p className="lead">Scan your face, hair and hands with your camera (or just answer {QUESTIONS.length} quick questions). You&apos;ll get your skin profile, a simple routine, the treatments that suit you best, product picks and your member offers.</p>
         <div className="row" style={{ margin: "18px 0" }}>
-          <span className="tag">🕑 2 minutes</span>
-          <span className="tag">🔒 Private to your account</span>
+          <span className="tag">🕑 2–3 minutes</span>
+          <span className="tag">📷 Photos never leave your phone</span>
           <span className="tag">✦ Personal offers</span>
         </div>
-        <button className="btn btn-lg" onClick={() => { setMode("quiz"); window.scrollTo({ top: 0 }); }}>Start the check</button>
+        <div className="row">
+          <button className="btn btn-lg" onClick={() => { setMode("scan"); top(); }}>📷 Start with a camera scan</button>
+          <button className="btn btn-lg btn-ghost" onClick={() => { setMode("quiz"); top(); }}>Answer questions only</button>
+        </div>
         <p className="small muted" style={{ marginTop: 18, marginBottom: 0 }}>This is a guide, not a medical diagnosis. Your stylist confirms everything with a quick skin check at your visit.</p>
       </div>
     );
+
+  if (mode === "scan") return <ScanStudio onContinue={fromScan} onSkip={() => { setMode("quiz"); top(); }} />;
 
   if (mode === "quiz")
     return (
@@ -73,13 +92,17 @@ export default function SkinCheck({ initial }: { initial: Recommendations }) {
         <div className="progress"><span style={{ width: `${((step + 1) / QUESTIONS.length) * 100}%` }} /></div>
         <h2>{q.title}</h2>
         {q.help && <p className="muted">{q.help}</p>}
+        {suggested[q.id] !== undefined && <p className="small" style={{ color: "var(--brand)" }}>📷 We pre-selected what your scan suggests — change it if it doesn&apos;t feel right.</p>}
         <div className="opt-grid" role={q.multi ? "group" : "radiogroup"} aria-label={q.title}>
           {q.options.map((o) => {
             const on = q.multi ? Array.isArray(value) && value.includes(o.value) : value === o.value;
+            const sug = suggested[q.id];
+            const scanned = Array.isArray(sug) ? sug.includes(o.value) : sug === o.value;
             return (
               <button key={o.value} type="button" className={`opt ${on ? "on" : ""}`} role={q.multi ? "checkbox" : "radio"} aria-checked={on} onClick={() => pick(o.value)}>
                 <strong>{on ? "✓ " : ""}{o.label}</strong>
                 {o.note && <span>{o.note}</span>}
+                {scanned && <span className="from-scan">📷 from your scan</span>}
               </button>
             );
           })}
@@ -111,14 +134,33 @@ export default function SkinCheck({ initial }: { initial: Recommendations }) {
               {a.concernLabels.map((c) => <span key={c} className="tag tag-gold">{c}</span>)}
               <span className="tag">Hair: {a.hairType}</span>
               {a.hairConcernLabels.map((c) => <span key={c} className="tag tag-gold">{c}</span>)}
+              {a.nailLabels.map((c) => <span key={c} className="tag tag-gold">💅 {c}</span>)}
             </div>
           </div>
           <div className="row">
-            <button className="btn btn-ghost btn-sm" onClick={() => { setStep(0); setMode("quiz"); window.scrollTo({ top: 0 }); }}>Retake check</button>
+            <button className="btn btn-ghost btn-sm" onClick={() => { setMode("scan"); top(); }}>📷 Scan again</button>
+            <button className="btn btn-ghost btn-sm" onClick={() => { setStep(0); setMode("quiz"); top(); }}>Edit answers</button>
             <Link href="/book" className="btn btn-sm">Book a treatment</Link>
           </div>
         </div>
       </section>
+
+      {scans.length > 0 && (
+        <section className="card">
+          <h2 style={{ fontSize: "1.4rem" }}>📷 What your scan showed</h2>
+          <div className="grid">
+            {scans.map((r) => (
+              <div key={r.kind}>
+                <strong>{r.kind === "face" ? "Face" : r.kind === "hair" ? "Hair" : "Hands & nails"}: {r.headline}</strong>
+                <ul className="small" style={{ paddingLeft: 18, margin: "6px 0 0" }}>
+                  {r.findings.map((f) => <li key={f.key}><strong>{f.label}:</strong> {f.text}</li>)}
+                </ul>
+              </div>
+            ))}
+          </div>
+          <p className="small muted" style={{ marginBottom: 0 }}>Your photos were analysed on your phone and not saved. Your stylist confirms everything at your visit.</p>
+        </section>
+      )}
 
       <section>
         <h2>Treatments we recommend</h2>
@@ -164,7 +206,7 @@ export default function SkinCheck({ initial }: { initial: Recommendations }) {
       </section>
 
       <section>
-        <div className="spread"><h2>Products for your skin &amp; hair</h2><Link href="/account/products" className="small">All products →</Link></div>
+        <div className="spread"><h2>Products for your skin, hair &amp; nails</h2><Link href="/account/products" className="small">All products →</Link></div>
         <div className="grid">
           {data.products.map((p) => (
             <div key={p.id} className="card">

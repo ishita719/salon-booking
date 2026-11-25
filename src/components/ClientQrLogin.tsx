@@ -4,7 +4,7 @@ import Link from "next/link";
 import QrCode from "@/components/QrCode";
 
 /** Client login = QR only. On a computer: scan this QR with your phone. Already on your phone: continue here. */
-export default function ClientQrLogin({ welcomeUrl }: { welcomeUrl: string }) {
+export default function ClientQrLogin({ welcomeUrl, next = "/book" }: { welcomeUrl: string; next?: string }) {
   return (
     <div className="auth-wrap">
       <aside className="auth-side">
@@ -24,10 +24,10 @@ export default function ClientQrLogin({ welcomeUrl }: { welcomeUrl: string }) {
           <h1 style={{ fontSize: "2rem" }}>Client login</h1>
           <p className="muted">Point your phone&apos;s camera at this code</p>
           <div style={{ display: "grid", placeItems: "center", margin: "18px 0" }}>
-            <QrCode value={welcomeUrl} size={240} label="Scan to sign in with your phone" />
+            <QrCode value={welcomeUrl} size={240} label="Scan to book on your phone" />
           </div>
           <div className="or-divider"><span>QR not working, or already on your phone?</span></div>
-          <Link href="/welcome" className="btn btn-lg btn-block">Log in with name &amp; phone</Link>
+          <Link href={`/welcome?next=${encodeURIComponent(next)}`} className="btn btn-lg btn-block">Log in with name &amp; phone</Link>
           <p className="small muted" style={{ marginTop: 10 }}>New here? The same page creates your account — no password needed.</p>
           <p className="small muted" style={{ marginTop: 22 }}>Work at the salon? <Link href="/team">Salon team login →</Link></p>
         </div>

@@ -10,7 +10,7 @@ Code lives on GitHub; Cloudflare rebuilds and publishes the site on every push.
 
 **Public website:** home page (hero, services, online skin-check, at-home visits, team, **our work gallery**, member-offers teaser, reviews, hours), services with a **"How it's done"** step-by-step page for each, gallery.
 
-**Clients (after login, `/login`):** *For you* home · **online skin & hair check** (9 questions → skin profile, AM/PM routine, recommended treatments & products) · **personal offers** applied automatically · booking with **online payment (Stripe)** or pay at salon · appointments (reschedule, cancel, pay now, calendar) · feedback & ratings.
+**Clients (after login, `/login`):** *For you* home · **online skin, hair & nails check** (optional **camera scan** + 10 questions → skin profile, AM/PM routine, recommended treatments & products) · **personal offers** applied automatically · booking with **online payment (Stripe)** or pay at salon · appointments (reschedule, cancel, pay now, calendar) · feedback & ratings.
 
 **Owner (`/team` → Owner):** dashboard · **Insights** (site visitors, bookings made, visit→booking rate, services booked & charges, payments online/at salon/outstanding, offers used, busiest days & times, repeat clients, skin-check trends, **CSV export**) · appointments (status, move, **mark paid / refunded**) · clients · team & **team secret code** · manage services (with *good for* tags + steps), **offers, products, gallery** (photo upload), feedback.
 
@@ -19,7 +19,7 @@ Code lives on GitHub; Cloudflare rebuilds and publishes the site on every push.
 ## Easy sign-in
 
 - **Clients — QR first, name + phone as backup (no passwords, no sign-up forms):**
-  - **New client:** scan the salon QR (print it from **Owner → Manage → QR codes**) → type name + phone (email optional, only for confirmations) → signed in on that phone for 6 months.
+  - **Scanning the salon QR opens online booking** (print it from **Owner → Manage → QR codes**). Not signed in yet → type name + phone (email optional, only for confirmations) → straight on to booking, and that phone stays signed in for 6 months. Next time the scan goes directly to booking.
   - **On a computer:** the Client login page (`/login`) shows the QR. While testing locally the QR uses your PC's network address (e.g. `http://192.168.x.x:3000`), so a phone on the same Wi-Fi can open it.
   - **QR not working?** "Log in with name & phone": a returning client types their first name + phone number. The first name must match the account; 5 tries per number per hour, and a "new sign-in" email is sent if the client has an email. (Weaker than the QR — anyone who knows a client's name and number could log in.)
   - **Front-desk login QR** (one-time, 10 minutes) still works: Owner → Clients or staff on an appointment → **📱 Login QR**.
@@ -29,6 +29,21 @@ Code lives on GitHub; Cloudflare rebuilds and publishes the site on every push.
   - **New owner account** (`/team/setup`): name + email + secret code — no invite needed. The very first owner is active at once (and also sets the staff team code, plus `SETUP_CODE` if configured). Every later owner account **waits for approval**: existing owners see it on the dashboard and approve or decline it on **Owner → Team → Co-owners** (they also get an email). Until then that secret code can't log in.
 - **Staff:** email + password + the team secret code (unchanged).
 - Owner email codes need `RESEND_API_KEY` in production. In local development without it, the code is shown on screen in a yellow "Test mode" box.
+
+## Camera skin, hair & nails scan
+
+Clients → **Skin check** → "📷 Start with a camera scan" (or "Answer questions only").
+
+- Three scans, each optional: **Face** (oval guide), **Hair** and **Hands & nails** (box guide). Live camera, or "Take or upload a photo" (which opens the phone camera too).
+- **Runs on the phone** (`src/lib/scan.ts`): the photo is analysed in the browser and **never uploaded or saved**.
+- What it measures:
+  - **Face:** shine on the T-zone vs cheeks → oily / combination / dry / normal; pores & texture, redness, red or dark spots, radiance.
+  - **Hair:** strand direction → straight / wavy / curly / coily; frizz, shine (dryness/damage), grey or fashion colour, scalp showing.
+  - **Hands:** dry skin & cuticles, nail polish.
+- Rejects photos that are too dark, too bright, blurry, or don't show a face/hair/hand.
+- The results **pre-fill the quiz** (marked "📷 from your scan"). The client confirms or changes them, then gets their profile, routine, treatments (one pick per area first: skin, hair, colour, nails…), products and offers.
+- It's an estimate from simple image measurements (lighting matters), not a medical diagnosis — the page says so, and the stylist confirms at the visit.
+- The **live camera needs https** (works on the Cloudflare site). On the local Wi-Fi address (`http://192.168…`) phones block the live camera, so use "Take or upload a photo" there.
 
 ## Who uses it
 

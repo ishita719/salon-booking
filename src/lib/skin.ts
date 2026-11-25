@@ -37,6 +37,7 @@ export interface Question {
   help?: string;
   multi?: boolean;
   max?: number;
+  optional?: boolean; // multi-choice that may be left empty
   options: { value: string; label: string; note?: string }[];
 }
 
@@ -49,6 +50,7 @@ export interface SkinAnswers {
   sun: "daily" | "sometimes" | "never";
   hairType: "straight" | "wavy" | "curly" | "coily";
   hairConcerns: ("frizz" | "damage" | "thinning" | "color" | "scalp")[];
+  nailConcerns: ("brittle" | "cuticles" | "dryhands" | "art")[];
   goal: "glow" | "fix" | "event" | "relax";
 }
 
@@ -133,12 +135,27 @@ export const QUESTIONS: Question[] = [
     help: "Choose any that apply (or none).",
     multi: true,
     max: 5,
+    optional: true,
     options: [
       { value: "frizz", label: "Frizz" },
       { value: "damage", label: "Dry, damaged or breaking hair" },
       { value: "thinning", label: "Thinning or shedding" },
       { value: "color", label: "Colour-treated hair" },
       { value: "scalp", label: "Oily, itchy or flaky scalp" },
+    ],
+  },
+  {
+    id: "nailConcerns",
+    title: "Hands & nails",
+    help: "Choose any that apply (or none).",
+    multi: true,
+    max: 4,
+    optional: true,
+    options: [
+      { value: "brittle", label: "Brittle, splitting or peeling nails" },
+      { value: "cuticles", label: "Dry or ragged cuticles" },
+      { value: "dryhands", label: "Dry hands" },
+      { value: "art", label: "I'd love a fresh manicure or nail art" },
     ],
   },
   {
@@ -162,6 +179,10 @@ export function parseAnswers(raw: unknown): SkinAnswers | null {
     const allowed = q.options.map((o) => o.value);
     const v = r[q.id];
     if (q.multi) {
+      if (v === undefined && q.optional) {
+        out[q.id] = []; // older saved checks don't have every optional question
+        continue;
+      }
       if (!Array.isArray(v)) return null;
       const vals = [...new Set(v.filter((x): x is string => typeof x === "string" && allowed.includes(x)))].slice(0, q.max ?? 5);
       if (q.id === "concerns" && vals.length === 0) return null;
@@ -180,6 +201,7 @@ export interface SkinAnalysis {
   concerns: Target[];
   hairType: string;
   hairConcerns: Target[];
+  nailLabels: string[]; // hands & nails answers, as readable labels
   needs: Target[]; // everything we try to match services/products against
   headline: string;
   summary: string;
@@ -187,6 +209,7 @@ export interface SkinAnalysis {
   tips: string[];
 }
 
+const NAIL_LABEL = { brittle: "Brittle nails", cuticles: "Dry cuticles", dryhands: "Dry hands", art: "Manicure / nail art" } as const;
 const SKIN_LABEL = { oily: "oily", combination: "combination", dry: "dry", normal: "balanced (normal)" };
 
 export function analyzeSkin(a: SkinAnswers): SkinAnalysis {
@@ -201,7 +224,9 @@ export function analyzeSkin(a: SkinAnswers): SkinAnalysis {
   const hairConcerns = new Set<Target>(a.hairConcerns);
   if (a.hairType === "curly" || a.hairType === "coily") hairConcerns.add("curly");
 
+  const nails = a.nailConcerns ?? [];
   const needs = new Set<Target>([skinType, ...concerns, ...hairConcerns]);
+  if (nails.length) needs.add("nails");
   if (sensitivity === "high") needs.add("sensitive");
   if (a.goal === "event") needs.add("event");
 
@@ -228,6 +253,8 @@ export function analyzeSkin(a: SkinAnswers): SkinAnalysis {
   if (skinType === "dry" || concerns.has("dehydration")) weekly.push("Overnight hydrating mask 1–2 times a week");
   if (hairConcerns.has("damage") || hairConcerns.has("color") || hairConcerns.has("frizz")) weekly.push("Bond-repair or deep-conditioning hair mask");
   if (hairConcerns.has("scalp") || hairConcerns.has("thinning")) weekly.push("Scalp scrub or massage to boost circulation");
+  if (nails.includes("cuticles") || nails.includes("brittle")) weekly.push("Cuticle oil every night; file nails in one direction");
+  if (nails.includes("dryhands")) weekly.push("Overnight hand mask: rich hand cream under cotton gloves");
 
   const tips: string[] = [];
   if (a.sun !== "daily") tips.push("Daily sunscreen is the single biggest thing you can do for dark spots and fine lines.");
@@ -236,6 +263,7 @@ export function analyzeSkin(a: SkinAnswers): SkinAnalysis {
   if (skinType === "dry") tips.push("Apply moisturiser on slightly damp skin to lock hydration in.");
   if (hairConcerns.has("curly")) tips.push("Detangle curls only when wet and conditioned, using fingers or a wide-tooth comb.");
   if (hairConcerns.has("color")) tips.push("Wash colour-treated hair in lukewarm water and use a sulphate-free shampoo.");
+  if (nails.includes("brittle")) tips.push("Wear gloves for dishes and cleaning — water and detergent make nails peel.");
 
   return {
     skinType,
@@ -243,6 +271,7 @@ export function analyzeSkin(a: SkinAnswers): SkinAnalysis {
     concerns: [...concerns],
     hairType: a.hairType,
     hairConcerns: [...hairConcerns],
+    nailLabels: nails.map((n) => NAIL_LABEL[n]),
     needs: [...needs],
     headline: headline.charAt(0).toUpperCase() + headline.slice(1),
     summary:
@@ -270,11 +299,24 @@ export function matchItem(itemTargets: string, analysis: Pick<SkinAnalysis, "nee
   return { score, reasons };
 }
 
-/** Ranks items by match score (best first), dropping items that don't match at all. */
-export function rankItems<T extends { targets: string }>(items: T[], analysis: Pick<SkinAnalysis, "needs" | "sensitivity">, limit: number) {
-  return items
+/**
+ * Ranks items by match score (best first), dropping items that don't match at all. With a `category`, the best
+ * item of each category comes first, so skin, hair, colour and nails each get a pick before any area gets a second.
+ */
+export function rankItems<T extends { targets: string; category?: string }>(items: T[], analysis: Pick<SkinAnalysis, "needs" | "sensitivity">, limit: number) {
+  const ranked = items
     .map((item) => ({ item, ...matchItem(item.targets, analysis) }))
     .filter((r) => r.score > 0)
-    .sort((a, b) => b.score - a.score)
-    .slice(0, limit);
+    .sort((a, b) => b.score - a.score);
+  const seen = new Set<string>();
+  const firsts = ranked.filter((r) => {
+    const c = r.item.category;
+    if (!c || seen.has(c)) return false;
+    seen.add(c);
+    return true;
+  });
+  const rest = ranked.filter((r) => !firsts.includes(r));
+  return [...firsts.slice(0, limit), ...rest]
+    .slice(0, limit)
+    .sort((a, b) => b.score - a.score);
 }

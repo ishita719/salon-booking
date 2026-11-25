@@ -11,7 +11,7 @@ const PORTALS: { prefix: string; roles: string[]; login: string }[] = [
   { prefix: "/owner", roles: ["OWNER"], login: "/team" },
   { prefix: "/staff", roles: ["STAFF"], login: "/team" },
   { prefix: "/account", roles: ["CUSTOMER"], login: "/login" },
-  { prefix: "/book", roles: ["CUSTOMER", "STAFF", "OWNER"], login: "/login" },
+  { prefix: "/book", roles: ["CUSTOMER", "STAFF", "OWNER"], login: "/welcome" }, // the salon QR opens /book
   { prefix: "/settings", roles: ["CUSTOMER", "STAFF", "OWNER"], login: "/login" },
 ];
 

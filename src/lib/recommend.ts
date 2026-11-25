@@ -19,7 +19,7 @@ export async function getRecommendations(db: DB, userId: string) {
   ]);
 
   const recServices = analysis
-    ? rankItems(services, analysis, 4).map(({ item: s, reasons, score }) => {
+    ? rankItems(services, analysis, 6).map(({ item: s, reasons, score }) => {
         const best = bestOffer(offers, [s], firstVisit);
         return {
           id: s.id,
@@ -36,10 +36,10 @@ export async function getRecommendations(db: DB, userId: string) {
       })
     : [];
 
-  let recProducts = analysis ? rankItems(products, analysis, 6) : [];
+  let recProducts = analysis ? rankItems(products, analysis, 8) : [];
   // Sunscreen is part of every routine — make sure it's in the list.
   const spf = products.find((p) => p.targets.includes(analysis?.skinType ?? "~") && p.category.toLowerCase().includes("sun"));
-  if (analysis && spf && !recProducts.some((r) => r.item.id === spf.id)) recProducts = [...recProducts.slice(0, 5), { item: spf, score: 1, reasons: ["Daily protection"] }];
+  if (analysis && spf && !recProducts.some((r) => r.item.id === spf.id)) recProducts = [...recProducts.slice(0, 7), { item: spf, score: 1, reasons: ["Daily protection"] }];
 
   const recIds = new Set(recServices.map((s) => s.id));
   const relevantOffers = offers
